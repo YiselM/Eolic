@@ -44,7 +44,7 @@ DataCurrent = []
 t = []
 start = time.time()
 
-for x in range(2000):
+for i in range(2000):
         
     Current = ch0.voltage
     Voltage = ch3.voltage
@@ -58,28 +58,31 @@ for x in range(2000):
     timenow=(time.time()-start)
     t.append(timenow)
     
+    filteredVol[i] = filteredVol[i]*9.5853-0.1082
+    filteredCur[i] = filteredCur[i]*1.4089+0.1326
+    
     print("| {0:^5.3f} | {1:^5.3f} | {2:^5.3f} | {3:^5.3f} | {4:^5.3f} |".format(timenow,Voltage,Current,filteredVol[i],filteredCur[i]))
     
-    
+        
     file.write(str(timenow)+';'+str(Voltage)+';'+str(Current)+';'+str(filteredVol[i])+';'+str(filteredCur[i])+"\n")
     file.flush()
     
-    i=i+1
+
 file.close()
 
 #t=np.arange(0,2000)
-plt.figure(0)
+#plt.figure(0)
 
-plt.subplot(1,2,1)
-plt.plot(t,DataVoltage)
-plt.title('Data')
-plt.xlabel('Time (s)')
-plt.ylabel('Voltage (V)')
-plt.subplot(1,2,2)
-plt.plot(t,DataCurrent)
-plt.title('Data')
-plt.xlabel('Time (s)')
-plt.ylabel('Current (I)')
+# plt.subplot(1,2,1)
+# plt.plot(t,DataVoltage)
+# plt.title('Data')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Voltage (V)')
+# plt.subplot(1,2,2)
+# plt.plot(t,DataCurrent)
+# plt.title('Data')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Current (I)')
 
 plt.figure(1)
 plt.subplot(1,2,1)
