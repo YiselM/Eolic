@@ -154,7 +154,7 @@ start = time.time()
 
 pid = PID(0.55,0.9,0.005)
 
-pid.SetPoint=18
+pid.SetPoint=20
 pid.setSampleTime(0.01)
 feedback = 0
 feedback_list = []
