@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import os
 import time
 import board
@@ -24,6 +18,7 @@ ads = ADS.ADS1115(i2c)
 # Create single-ended input on channel 0
 ch0 = AnalogIn(ads, ADS.P0)
 ch3 = AnalogIn(ads, ADS.P3)
+ch2 = AnalogIn(ads, ADS.P2)
 
 # Create differential input between channel 0 and 1
 dif01 = AnalogIn(ads, ADS.P0, ADS.P1)
@@ -33,7 +28,7 @@ ads.gain = 2/3
 ads.data_rate = 860
  
 # Create a DAC instance.
-DAC = Adafruit_MCP4725.MCP4725(address=0x49, busnum=1)
+DAC = Adafruit_MCP4725.MCP4725(address=0x60, busnum=1)
 
 #Create Class PID
 import time
@@ -165,8 +160,10 @@ pidmax = 5
 for i in range(2000):
         
     Current = ch0.voltage
+    voldac = ch2.voltage
     Voltage = ch3.voltage
 
+       
     DataVoltage.append(VolFilter.filter(Voltage))
     DataCurrent.append(CurFilter.filter(Current)) 
     
@@ -176,13 +173,21 @@ for i in range(2000):
     DataVoltage[i] = DataVoltage[i]*9.5853-0.1082
     DataCurrent[i] = DataCurrent[i]*1.4089+0.1326
     
-    DataPower[i] = DataVoltage[i]*DataCurrent[i]
+    #DataPower[i] = DataVoltage[i]*DataCurrent[i]
+    #volt = 3
+    volt=int(input('Digite voltaje'))
     
-    volt=2
+    if volt > 5:
+        volt = 5
+    elif volt < 0:
+        volt = 0
+    
     voltbits=int((4096/5)*volt)
     DAC.set_voltage(voltbits)
+    time.sleep(0.5)
+    print(voldac)
     
-    print("| {0:^5.3f} | {1:^5.3f} | {2:^5.3f} |".format(DataVoltage[i],DataCurrent[i],DataPower[i]))
+    #print("| {0:^5.3f} | {1:^5.3f} |".format(DataVoltage[i],DataCurrent[i]))
     
 #t=np.arange(0,2000)
 #plt.figure(0)
