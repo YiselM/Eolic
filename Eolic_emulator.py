@@ -42,6 +42,8 @@ class PID:
         self.Kp = P
         self.Ki = I
         self.Kd = D
+        self.min = -400
+        self.max = 400
 
         self.sample_time = 0.01
         self.current_time = current_time if current_time is not None else time.time()
@@ -131,8 +133,12 @@ class PID:
 print("| {0:^5} | {1:^5} | {2:^5} | {3:^5} | {4:^5} |".format('t','V','I','FiltV','FiltI'))
 print('-' * 17)
 
+#----------------------------------------FILTER SETUP----------------------------------------------
+
 VolFilter = IIR2Filter(1,[1],'lowpass','butter',fs=1000)
 CurFilter = IIR2Filter(1,[1],'lowpass','butter',fs=1000)
+
+#--------------------------------------------------------------------------------------------------
 
 filteredVol = []
 filteredCur = []
@@ -144,9 +150,11 @@ DataPower = []
 t = []
 start = time.time()
 
+#-----------------------------------------PID SETUP-----------------------------------------------
+
 pid = PID(0.55,0.9,0.005)
 
-pid.SetPoint=10
+pid.SetPoint=18
 pid.setSampleTime(0.01)
 feedback = 0
 feedback_list = []
@@ -155,71 +163,97 @@ time_list = []
 pidmin = 0 
 pidmax = 5
 
+# -----------------------------------------------------------------------------------------------
+
+
 voltajedac = 0
 DAC.set_voltage(voltajedac)
 
-for i in range(5000):
+for i in range(2000):
         
     Current = ch0.voltage
     Voltage = ch3.voltage
-       
+    
+    
+    
+#-----------------------------------------IRR FILTER----------------------------------------------
+
     DataVoltage.append(VolFilter.filter(Voltage))
     DataCurrent.append(CurFilter.filter(Current)) 
     
+#-------------------------------------------------------------------------------------------------
+
+
+
+
     timenow=(time.time()-start)
     t.append(timenow)
        
-    DataVoltage[i] = DataVoltage[i]*9.5853-0.1082
-    DataCurrent[i] = DataCurrent[i]*1.4089+0.1326
+    DataVoltage[i]=DataVoltage[i]*9.5853-0.1082
+    DataCurrent[i]=DataCurrent[i]*1.4089+0.1326
     
-    DataPower[i] = DataVoltage[i]*DataCurrent[i]
+    DataPower.append(DataVoltage[i]*DataCurrent[i])
     
-    pid.update(datapower[i])    
+    
+    
+    
+    
+# --------------------------------------- PID CONTROLLER------------------------------------------
+
+    pid.update(DataPower[i])    
     output = pid.output
     
     if pid.SetPoint > 0:
-        voltajedac = voltajedac + (output - (1/i)
+        voltajedac = voltajedac + (output - (1/(i+1)))
     
     if voltajedac < pidmin:
         voltajedac = pidmin
     elif voltajedac > pidmax:
         voltajedac = pidmax
+        
+# ------------------------------------------------------------------------------------------------
+
+    #voltajedac=3
+
+# ---------------------------------------------DAC------------------------------------------------
 
     voltbits=int((4096/5)*voltajedac)
     DAC.set_voltage(voltbits)   
-    time.sleep(0.01)
-    feedback_list.append(voltajedac)
-    time_list.append(i)
+    #time.sleep(0.1)
     
-    
-    print(voltajedac)
-    
-    
-#t=np.arange(0,2000)
-#plt.figure(0)
+# ------------------------------------------------------------------------------------------------
 
-# plt.subplot(1,2,1)
-# plt.plot(t,DataVoltage)
-# plt.title('Data')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Voltage (V)')
-# plt.subplot(1,2,2)
-# plt.plot(t,DataCurrent)
-# plt.title('Data')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Current (I)')
 
-# plt.figure(1)
-# plt.subplot(1,2,1)
-# plt.plot(t,filteredVol)
-# plt.title('Filtered Voltage')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Voltage (V)')
-# plt.subplot(1,2,2)
-# plt.plot(t,filteredCur)
-# plt.title('Filtered Current')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Current (I)')
+
+    
+    
+    
+    print("| {0:^5.2f} | {1:^5.2f} |".format(DataCurrent[i],DataVoltage[i]))
+    #print("| {0:^5.2f} | {1:^5.2f} | {2:^5.2f} |".format(DataVoltage[i],DataCurrent[i],DataPower[i]))
+    #print(voltajedac)
+    
+    
+
+plt.figure(0)
+
+plt.subplot(1,2,1)
+plt.plot(t,DataVoltage)
+plt.title('Data')
+plt.xlabel('Time (s)')
+plt.ylabel('Voltage (V)')
+plt.subplot(1,2,2)
+plt.plot(t,DataCurrent)
+plt.title('Data')
+plt.xlabel('Time (s)')
+plt.ylabel('Current (I)')
+
+plt.figure(1)
+plt.plot(t,DataPower)
+plt.title('Data')
+plt.xlabel('Time (s)')
+plt.ylabel('Power (W)')
+
+
 
 
 plt.show()
