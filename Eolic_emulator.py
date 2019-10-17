@@ -42,8 +42,6 @@ class PID:
         self.Kp = P
         self.Ki = I
         self.Kd = D
-        self.max = 5
-        self.min = 0
 
         self.sample_time = 0.01
         self.current_time = current_time if current_time is not None else time.time()
@@ -148,7 +146,7 @@ start = time.time()
 
 pid = PID(0.55,0.9,0.005)
 
-pid.SetPoint=10.0
+pid.SetPoint=10
 pid.setSampleTime(0.01)
 feedback = 0
 feedback_list = []
@@ -157,12 +155,13 @@ time_list = []
 pidmin = 0 
 pidmax = 5
 
-for i in range(2000):
+voltajedac = 0
+DAC.set_voltage(voltajedac)
+
+for i in range(5000):
         
     Current = ch0.voltage
-    voldac = ch2.voltage
     Voltage = ch3.voltage
-
        
     DataVoltage.append(VolFilter.filter(Voltage))
     DataCurrent.append(CurFilter.filter(Current)) 
@@ -173,21 +172,28 @@ for i in range(2000):
     DataVoltage[i] = DataVoltage[i]*9.5853-0.1082
     DataCurrent[i] = DataCurrent[i]*1.4089+0.1326
     
-    #DataPower[i] = DataVoltage[i]*DataCurrent[i]
-    #volt = 3
-    volt=int(input('Digite voltaje'))
+    DataPower[i] = DataVoltage[i]*DataCurrent[i]
     
-    if volt > 5:
-        volt = 5
-    elif volt < 0:
-        volt = 0
+    pid.update(datapower[i])    
+    output = pid.output
     
-    voltbits=int((4096/5)*volt)
-    DAC.set_voltage(voltbits)
-    time.sleep(0.5)
-    print(voldac)
+    if pid.SetPoint > 0:
+        voltajedac = voltajedac + (output - (1/i)
     
-    #print("| {0:^5.3f} | {1:^5.3f} |".format(DataVoltage[i],DataCurrent[i]))
+    if voltajedac < pidmin:
+        voltajedac = pidmin
+    elif voltajedac > pidmax:
+        voltajedac = pidmax
+
+    voltbits=int((4096/5)*voltajedac)
+    DAC.set_voltage(voltbits)   
+    time.sleep(0.01)
+    feedback_list.append(voltajedac)
+    time_list.append(i)
+    
+    
+    print(voltajedac)
+    
     
 #t=np.arange(0,2000)
 #plt.figure(0)
@@ -203,17 +209,17 @@ for i in range(2000):
 # plt.xlabel('Time (s)')
 # plt.ylabel('Current (I)')
 
-plt.figure(1)
-plt.subplot(1,2,1)
-plt.plot(t,filteredVol)
-plt.title('Filtered Voltage')
-plt.xlabel('Time (s)')
-plt.ylabel('Voltage (V)')
-plt.subplot(1,2,2)
-plt.plot(t,filteredCur)
-plt.title('Filtered Current')
-plt.xlabel('Time (s)')
-plt.ylabel('Current (I)')
+# plt.figure(1)
+# plt.subplot(1,2,1)
+# plt.plot(t,filteredVol)
+# plt.title('Filtered Voltage')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Voltage (V)')
+# plt.subplot(1,2,2)
+# plt.plot(t,filteredCur)
+# plt.title('Filtered Current')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Current (I)')
 
 
 plt.show()
