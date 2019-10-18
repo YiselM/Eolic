@@ -133,8 +133,9 @@ print("| {0:^5} | {1:^5} | {2:^5} | {3:^5} | {4:^5} |".format('t','V','I','FiltV
 print('-' * 17)
 
 #----------------------------------------FILTER SETUP----------------------------------------------
-VolFilter = IIR2Filter(1,[2],'lowpass','butter',fs=1000)
-CurFilter = IIR2Filter(1,[200],'lowpass','butter',fs=1000)
+VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
+CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
+#PIDFilter = IIR2Filter(1,[20],'lowpass','butter',fs=1000)
 #--------------------------------------------------------------------------------------------------
 filteredVol = []
 filteredCur = []
@@ -142,15 +143,16 @@ filteredCur = []
 DataVoltage = []
 DataCurrent = []
 DataPower = []
+DataOut = []
 
 t = []
 start = time.time()
 
 #-----------------------------------------PID SETUP-----------------------------------------------
 #pid = PID(0.55,0.9,0.005)
-pid = PID(0.55,1,0.01)
+pid = PID(0.55,1,0.005)
 pid.SetPoint=20
-pid.setSampleTime(0.01)
+pid.setSampleTime(0.001)
 feedback = 0
 feedback_list = []
 time_list = []
@@ -184,7 +186,7 @@ for i in range(5000):
     
     DataPower.append(DataVoltage[i]*DataCurrent[i])
 # --------------------------------------- PID CONTROLLER------------------------------------------
-    pid.update(DataPower[i])    
+    pid.update(DataPower[i])
     output = pid.output
     
     if pid.SetPoint > 0:
@@ -195,8 +197,11 @@ for i in range(5000):
     elif voltajedac > pidmax:
         voltajedac = pidmax
 # ---------------------------------------------DAC------------------------------------------------
+
+    #DataOut.append(PIDFilter.filter(voltajedac))
     voltbits=int((4096/5)*voltajedac)
     DAC.set_voltage(voltbits)    
+    
 # ------------------------------------------------------------------------------------------------   
     print("| {0:^5.3f} | {1:^5.3f} | {2:^5.3f} |".format(DataCurrent[i],DataVoltage[i],DataPower[i]))
 
@@ -222,6 +227,13 @@ plt.title('Data')
 plt.xlabel('Time (s)')
 plt.ylabel('Power (W)')
 plt.ylim(0,60)
+
+# plt.figure(2)
+# plt.plot(t,DataOut)
+# plt.title('Data')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Voltage (V)')
+# plt.ylim(0,6)
 
 plt.show()
 
