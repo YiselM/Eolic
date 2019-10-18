@@ -135,8 +135,8 @@ print('-' * 17)
 
 #----------------------------------------FILTER SETUP----------------------------------------------
 
-VolFilter = IIR2Filter(1,[1],'lowpass','butter',fs=1000)
-CurFilter = IIR2Filter(1,[1],'lowpass','butter',fs=1000)
+VolFilter = IIR2Filter(1,[150],'lowpass','butter',fs=1000)
+CurFilter = IIR2Filter(1,[150],'lowpass','butter',fs=1000)
 
 #--------------------------------------------------------------------------------------------------
 
@@ -152,8 +152,8 @@ start = time.time()
 
 #-----------------------------------------PID SETUP-----------------------------------------------
 
-pid = PID(0.55,0.9,0.005)
-
+#pid = PID(0.55,0.9,0.005)
+pid = PID(0.85,0.9,0)
 pid.SetPoint=20
 pid.setSampleTime(0.01)
 feedback = 0
@@ -169,7 +169,7 @@ pidmax = 5
 voltajedac = 0
 DAC.set_voltage(voltajedac)
 
-for i in range(2000):
+for i in range(5000):
         
     Current = ch0.voltage
     Voltage = ch3.voltage
@@ -183,12 +183,19 @@ for i in range(2000):
     
 #-------------------------------------------------------------------------------------------------
 
-
+    
 
 
     timenow=(time.time()-start)
     t.append(timenow)
-       
+    
+    if (timenow > 0 and timenow < 15):
+        pid.SetPoint=20
+    elif (timenow > 15 and timenow < 30):
+        pid.SetPoint=30
+    elif (timenow > 30 ):
+        pid.SetPoint=10
+        
     DataVoltage[i]=DataVoltage[i]*9.5853-0.1082
     DataCurrent[i]=DataCurrent[i]*1.4089+0.1326
     
@@ -241,17 +248,20 @@ plt.plot(t,DataVoltage)
 plt.title('Data')
 plt.xlabel('Time (s)')
 plt.ylabel('Voltage (V)')
+plt.ylim(0,60)
 plt.subplot(1,2,2)
 plt.plot(t,DataCurrent)
 plt.title('Data')
 plt.xlabel('Time (s)')
 plt.ylabel('Current (I)')
+plt.ylim(0,60)
 
 plt.figure(1)
 plt.plot(t,DataPower)
 plt.title('Data')
 plt.xlabel('Time (s)')
 plt.ylabel('Power (W)')
+plt.ylim(0,60)
 
 
 

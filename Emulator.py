@@ -15,7 +15,6 @@ import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 from IIR2Filter import IIR2Filter
 import Adafruit_MCP4725
-import openpyxl as px
 
 
 # In[ ]:
@@ -143,8 +142,8 @@ DAC = Adafruit_MCP4725.MCP4725(address=0x60, busnum=1)
 
 #----------------------------------------FILTER SETUP----------------------------------------------
 
-VolFilter = IIR2Filter(1,[1],'lowpass','butter',fs=1000)
-CurFilter = IIR2Filter(1,[1],'lowpass','butter',fs=1000)
+VolFilter = IIR2Filter(1,[100],'lowpass','butter',fs=1000)
+CurFilter = IIR2Filter(1,[100],'lowpass','butter',fs=1000)
 
 #--------------------------------------------------------------------------------------------------
 
@@ -174,8 +173,8 @@ pidmax = 5
 # -----------------------------------------------------------------------------------------------
 
 
-#voltajedac = 0
-#DAC.set_voltage(voltajedac)
+voltajedac = 0
+DAC.set_voltage(voltajedac)
 
 
 # In[ ]:
@@ -194,22 +193,27 @@ def Calc_Voltage(ch3,DataVoltage,VolFilter):
 # In[27]:
 
 
-Curthread = threading.Thread(target=calc_current, args=(ch0,DataCurrent,CurFilter,))
-Volthread = threading.Thread(target=calc_quad, args=(ch3,DataVoltage,VolFilter,))
+Curthread = threading.Thread(target=Calc_Current, args=(ch0,DataCurrent,CurFilter,))
+Volthread = threading.Thread(target=Calc_Voltage, args=(ch3,DataVoltage,VolFilter,))
 start = time.time()
 
+
+# Will execute both in parallel
+Curthread.start()
+Volthread.start()
+
+print('Entrando al for...')
 for i in range(2000):    
     if __name__ == "__main__":    
-        # ---------------------------------------READ AND FILTER IN THREADS------------------------------------------
-        # Will execute both in parallel
-        thread1.start()
-        thread2.start()
+        # ---------------------------------------READ AND FILTER IN THREADS------------------------------------------     
+
         # Joins threads back to the parent process, which is this
         # program
-        thread1.join()
-        thread2.join()
-
-        DataPower.append(DataVoltage[-1]*DataCurrent[-1])
+        Curthread.join()
+        Volthread.join()
+        print (i)
+        print(DataVoltage)
+        DataPower.append(DataVoltage[i]*DataCurrent[i])
         timenow=(time.time()-start)
         t.append(timenow)
         
