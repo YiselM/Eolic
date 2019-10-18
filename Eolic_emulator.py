@@ -36,7 +36,6 @@ import time
 class PID:
     """PID Controller
     """
-
     def __init__(self, P=0.2, I=0.0, D=0.0, current_time=None):
 
         self.Kp = P
@@ -129,17 +128,14 @@ class PID:
         Based on a pre-determined sampe time, the PID decides if it should compute or return immediately.
         """
         self.sample_time = sample_time
-
+        
 print("| {0:^5} | {1:^5} | {2:^5} | {3:^5} | {4:^5} |".format('t','V','I','FiltV','FiltI'))
 print('-' * 17)
 
 #----------------------------------------FILTER SETUP----------------------------------------------
-
-VolFilter = IIR2Filter(1,[150],'lowpass','butter',fs=1000)
-CurFilter = IIR2Filter(1,[150],'lowpass','butter',fs=1000)
-
+VolFilter = IIR2Filter(1,[2],'lowpass','butter',fs=1000)
+CurFilter = IIR2Filter(1,[200],'lowpass','butter',fs=1000)
 #--------------------------------------------------------------------------------------------------
-
 filteredVol = []
 filteredCur = []
 
@@ -151,9 +147,8 @@ t = []
 start = time.time()
 
 #-----------------------------------------PID SETUP-----------------------------------------------
-
 #pid = PID(0.55,0.9,0.005)
-pid = PID(0.85,0.9,0)
+pid = PID(0.55,1,0.01)
 pid.SetPoint=20
 pid.setSampleTime(0.01)
 feedback = 0
@@ -162,30 +157,18 @@ time_list = []
 
 pidmin = 0 
 pidmax = 5
-
 # -----------------------------------------------------------------------------------------------
-
 
 voltajedac = 0
 DAC.set_voltage(voltajedac)
 
 for i in range(5000):
-        
     Current = ch0.voltage
     Voltage = ch3.voltage
-    
-    
-    
 #-----------------------------------------IRR FILTER----------------------------------------------
-
     DataVoltage.append(VolFilter.filter(Voltage))
-    DataCurrent.append(CurFilter.filter(Current)) 
-    
+    DataCurrent.append(CurFilter.filter(Current))     
 #-------------------------------------------------------------------------------------------------
-
-    
-
-
     timenow=(time.time()-start)
     t.append(timenow)
     
@@ -200,13 +183,7 @@ for i in range(5000):
     DataCurrent[i]=DataCurrent[i]*1.4089+0.1326
     
     DataPower.append(DataVoltage[i]*DataCurrent[i])
-    
-    
-    
-    
-    
 # --------------------------------------- PID CONTROLLER------------------------------------------
-
     pid.update(DataPower[i])    
     output = pid.output
     
@@ -217,30 +194,13 @@ for i in range(5000):
         voltajedac = pidmin
     elif voltajedac > pidmax:
         voltajedac = pidmax
-        
-# ------------------------------------------------------------------------------------------------
-
-    #voltajedac=3
-
 # ---------------------------------------------DAC------------------------------------------------
-
     voltbits=int((4096/5)*voltajedac)
-    DAC.set_voltage(voltbits)   
-    #time.sleep(0.1)
-    
-# ------------------------------------------------------------------------------------------------
+    DAC.set_voltage(voltbits)    
+# ------------------------------------------------------------------------------------------------   
+    print("| {0:^5.3f} | {1:^5.3f} | {2:^5.3f} |".format(DataCurrent[i],DataVoltage[i],DataPower[i]))
 
-
-
-    
-    
-    
-    print("| {0:^5.2f} | {1:^5.2f} |".format(DataCurrent[i],DataVoltage[i]))
-    #print("| {0:^5.2f} | {1:^5.2f} | {2:^5.2f} |".format(DataVoltage[i],DataCurrent[i],DataPower[i]))
-    #print(voltajedac)
-    
-    
-
+DAC.set_voltage(0)
 plt.figure(0)
 
 plt.subplot(1,2,1)
@@ -262,9 +222,6 @@ plt.title('Data')
 plt.xlabel('Time (s)')
 plt.ylabel('Power (W)')
 plt.ylim(0,60)
-
-
-
 
 plt.show()
 
