@@ -31,7 +31,7 @@ ads.data_rate = 860
 DAC = Adafruit_MCP4725.MCP4725(address=0x60, busnum=1)
 
 #Create Class PID
-import time
+
 
 class PID:
     """PID Controller
@@ -135,7 +135,7 @@ print('-' * 17)
 #----------------------------------------FILTER SETUP----------------------------------------------
 VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
 CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
-#PIDFilter = IIR2Filter(1,[20],'lowpass','butter',fs=1000)
+PIDFilter = IIR2Filter(1,[20],'lowpass','butter',fs=1000)
 #--------------------------------------------------------------------------------------------------
 filteredVol = []
 filteredCur = []
@@ -198,7 +198,7 @@ for i in range(5000):
         voltajedac = pidmax
 # ---------------------------------------------DAC------------------------------------------------
 
-    #DataOut.append(PIDFilter.filter(voltajedac))
+    DataOut.append(PIDFilter.filter(voltajedac))
     voltbits=int((4096/5)*voltajedac)
     DAC.set_voltage(voltbits)    
     
@@ -228,12 +228,12 @@ plt.xlabel('Time (s)')
 plt.ylabel('Power (W)')
 plt.ylim(0,60)
 
-# plt.figure(2)
-# plt.plot(t,DataOut)
-# plt.title('Data')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Voltage (V)')
-# plt.ylim(0,6)
+plt.figure(2)
+plt.plot(t,DataOut)
+plt.title('Data')
+plt.xlabel('Time (s)')
+plt.ylabel('Voltage (V)')
+plt.ylim(0,6)
 
 plt.show()
 
