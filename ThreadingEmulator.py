@@ -164,9 +164,9 @@ pidmin = 0
 pidmax = 5
 # -----------------------------------------------------------------------------------------------
 
+global voltajedac
 voltajedac = 0
 DAC.set_voltage(voltajedac)        
-
 
 # In[ ]:
 
@@ -223,33 +223,49 @@ class myThread3 (threading.Thread):
         #print ("Exiting " + self.name + "\n")
 
 def run_emulator(threadName, delay, counter):
-    global flagcur,flagvol
+    global flagcur,flagvol,voltajedac
     while True:
         time.sleep(delay)
         if threadName=="Midiendo y Filtrando Corriente":
-            Current = ch0.voltage
-            DataCurrent.append(CurFilter.filter(Current))
-            timenow=(time.time()-start)
-            t.append(timenow)
-            DataCurrent[counter]=DataCurrent[counter]*1.4089+0.1326
+            print("CUR")
+            try:
+                Current = ch0.voltage
+                DataCurrent.append(CurFilter.filter(Current))
+                timenow=(time.time()-start)
+                t.append(timenow)
+                DataCurrent[counter]=DataCurrent[counter]*1.4089+0.1326
+                flagcur=True
+            except IOError:
+                print ("IO ERROR")
+                counter-=1
+                            
             #print("%s: %s %s" % (threadName, time.ctime(time.time()), counter)+"\n")
-            print("Corriente: "+str(DataCurrent[counter])+"\n")
-            flagcur=True
+            #print("Corriente: "+str(DataCurrent[counter])+"\n")
+            
         elif threadName=="Midiendo y Filtrando Voltaje":
-            Voltage = ch3.voltage
-            DataVoltage.append(VolFilter.filter(Voltage))
-            timenow=(time.time()-start)
-            t.append(timenow)
-            DataVoltage[i]=DataVoltage[i]*9.5853-0.1082
-            if (timenow > 0 and timenow < 15):
-                pid.SetPoint=20
-            elif (timenow > 15 and timenow < 30):
-                pid.SetPoint=30
-            elif (timenow > 30 ):
-                pid.SetPoint=10
+            print("VOL")
+            try:
+                Voltage = ch3.voltage
+                DataVoltage.append(VolFilter.filter(Voltage))
+                timenow=(time.time()-start)
+                t.append(timenow)
+                DataVoltage[counter]=DataVoltage[counter]*9.5853-0.1082
+                if (timenow > 0 and timenow < 15):
+                    pid.SetPoint=20
+                elif (timenow > 15 and timenow < 30):
+                    pid.SetPoint=30
+                elif (timenow > 30 ):
+                    pid.SetPoint=10
+                flagvol=True
+            except IOError:
+                print ("IO ERROR")
+                counter-=1
+                pass
+            
+            
             #print("%s: %s %s" % (threadName, time.ctime(time.time()), counter)+"\n")
-            print("Voltaje: "+str(vollist[counter])+"\n")
-            flagvol=True
+            #print("Voltaje: "+str(DataVoltage[counter])+"\n")
+            
         elif threadName=="Realizando PID":
             if(flagcur==True and flagvol==True):
                 DataPower.append(DataVoltage[counter]*DataCurrent[counter])
@@ -271,10 +287,12 @@ def run_emulator(threadName, delay, counter):
     
                 # ------------------------------------------------------------------------------------------------
                 #print("%s: %s %s" % (threadName, time.ctime(time.time()), counter)+"\n")
-                print(str(counter)+" potencia: "+str(powlist[counter])+"tiempo: "+str(time.time()-start)+"\n")
+                #print(str(counter)+" potencia: "+str(powlist[counter])+"tiempo: "+str(time.time()-start)+"\n")
+                print(str(counter)+" Potencia: "+str(DataPower[counter])+" "+str(time.time()-start)+"\n")
                 flagcur=False
                 flagvol=False
             else:
+                print("ELSE")
                 counter-=1
         counter+=1
 
@@ -286,26 +304,29 @@ threadLock = threading.Lock()
 
 thread1 = myThread1(1, "Midiendo y Filtrando Corriente", 0)
 thread2 = myThread2(2,"Midiendo y Filtrando Voltaje", 0)
-
 thread3 = myThread1(3,"Realizando PID", 0)
 
 
 # Start new threads
-#thread1.start()
-#thread2.start()
-thread3.start()
 
-threadLock.acquire()
+# thread3.start()
+
+# threadLock.acquire()
+# thread1.start()
+# thread2.start()
+# thread1.join()
+# thread2.join()
+# threadLock.release()
+
+# thread3.join()
+
 thread1.start()
 thread2.start()
+thread3.start()
 thread1.join()
 thread2.join()
-threadLock.release()
-
 thread3.join()
-#threadLock.acquire()
-#threadLock.release()
-#thread3.start()
+
 
 
 print ("Exiting Main Thread")
