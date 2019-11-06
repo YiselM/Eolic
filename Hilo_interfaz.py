@@ -40,6 +40,10 @@ DataPower = []
 DataOut = []
 t = []
 
+K = 0
+
+code_enable = True
+
 
 class PID:
     """PID Controller
@@ -117,6 +121,14 @@ class PID:
     def setKd(self, derivative_gain):
         """Determines how aggressively the PID reacts to the current error with setting Derivative Gain"""
         self.Kd = derivative_gain
+    def getKp(self):
+        return self.Kp
+
+    def getKi(self):
+        return self.Ki
+
+    def getKd(self):
+        return self.Kd
 
     def setWindup(self, PIDmin, PIDmax):
         """Integral windup, also known as integrator windup or reset windup,
@@ -142,9 +154,11 @@ def animate(i):
 
     a.clear()
     a.plot(t,DataPower)
+    
 
 
 class Emulador_UNIGRID(tk.Tk):
+    
     
     def __init__(self, *args, **kwargs):
         
@@ -167,6 +181,7 @@ class Emulador_UNIGRID(tk.Tk):
     def show_frame(self, cont):
         frame = self.frames[cont]
         frame.tkraise()
+    
     
 class Code_thread(threading.Thread):
     global DAC
@@ -200,7 +215,7 @@ class Code_thread(threading.Thread):
         self.killed = True
 
     def run(self):
-                    
+        global code_enable
         #---------------------------------Inicializacion-----------------------------------------------------
         # Create the I2C bus
         i2c = busio.I2C(board.SCL, board.SDA)
@@ -224,8 +239,8 @@ class Code_thread(threading.Thread):
         
         
         # Create Current and Voltage Filters
-        VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
-        CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
+        VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=2000)
+        CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=2000)
         #PIDFilter = IIR2Filter(1,[20],'lowpass','butter',fs=1000)
     #--------------------------------------------------------------------------------------------------
 
@@ -234,9 +249,9 @@ class Code_thread(threading.Thread):
 
     #-----------------------------------------PID SETUP-----------------------------------------------
         #pid = PID(0.55,0.9,0.005)
-        pid = PID(0.55,1,0.005)
+        
         pid.SetPoint=20
-        pid.setSampleTime(0.001)
+        pid.setSampleTime(0.01)
         feedback = 0
         feedback_list = []
         time_list = []
@@ -249,47 +264,48 @@ class Code_thread(threading.Thread):
         DAC.set_voltage(voltajedac)
         i=0;
     #------------------------------------- MAIN LOOP--------------------------------------------------    
-        while True:
-            Current = ch0.voltage
-            Voltage = ch3.voltage
-        #-----------------------------------------IRR FILTER----------------------------------------------
-            DataVoltage.append(VolFilter.filter(Voltage))
-            DataCurrent.append(CurFilter.filter(Current))     
-        #-------------------------------------------------------------------------------------------------
-            timenow=(time.time()-start)
-            t.append(timenow)
-            
-            if (timenow > 0 and timenow < 15):
-                pid.SetPoint=20
-            elif (timenow > 15 and timenow < 30):
-                pid.SetPoint=30
-            elif (timenow > 30 ):
-                pid.SetPoint=10
+        while code_enable:
+            try:
+                Current = ch0.voltage
+                Voltage = ch3.voltage
+            #-----------------------------------------IRR FILTER----------------------------------------------
+                DataVoltage.append(VolFilter.filter(Voltage))
+                DataCurrent.append(CurFilter.filter(Current))     
+            #-------------------------------------------------------------------------------------------------
+                timenow=(time.time()-start)
+                t.append(timenow)
                 
-            DataVoltage[i]=DataVoltage[i]*9.5853-0.1082
-            DataCurrent[i]=DataCurrent[i]*1.4089+0.1326
-            
-            DataPower.append(DataVoltage[i]*DataCurrent[i])
-        # --------------------------------------- PID CONTROLLER------------------------------------------
-            pid.update(DataPower[i])
-            output = pid.output
-            
-            if pid.SetPoint > 0:
-                voltajedac = voltajedac + (output - (1/(i+1)))
-            
-            if voltajedac < pidmin:
-                voltajedac = pidmin
-            elif voltajedac > pidmax:
-                voltajedac = pidmax
-        # ---------------------------------------------DAC------------------------------------------------
-            voltbits=int((4096/5)*voltajedac)
-            DAC.set_voltage(voltbits)    
-          
-        # ------------------------------------------------------------------------------------------------   
-            #print("| {0:^5.3f} | {1:^5.3f} | {2:^5.3f} |".format(DataCurrent[i],DataVoltage[i],DataPower[i]))
-            i = i+1
-        
-
+                if (timenow > 0 and timenow < 15):
+                    pid.SetPoint=20
+                elif (timenow > 15 and timenow < 30):
+                    pid.SetPoint=30
+                elif (timenow > 30 ):
+                    pid.SetPoint=10
+                    
+                DataVoltage[i]=DataVoltage[i]*9.5853-0.1082
+                DataCurrent[i]=DataCurrent[i]*1.4089+0.1326
+                
+                DataPower.append(DataVoltage[i]*DataCurrent[i])
+            # --------------------------------------- PID CONTROLLER------------------------------------------
+                pid.update(DataPower[i])
+                output = pid.output
+                
+                if pid.SetPoint > 0:
+                    voltajedac = voltajedac + (output - (1/(i+1)))
+                
+                if voltajedac < pidmin:
+                    voltajedac = pidmin
+                elif voltajedac > pidmax:
+                    voltajedac = pidmax
+            # ---------------------------------------------DAC------------------------------------------------
+                voltbits=int((4096/5)*voltajedac)
+                DAC.set_voltage(voltbits)    
+              
+            # ------------------------------------------------------------------------------------------------   
+                #print("| {0:^5.3f} | {1:^5.3f} | {2:^5.3f} |".format(DataCurrent[i],DataVoltage[i],DataPower[i]))
+                i = i+1
+            except IOError:
+                print("IOError")
 
 class Principal(tk.Frame):
 
@@ -315,11 +331,15 @@ class Principal(tk.Frame):
 
        
 class Parametros(tk.Frame):
+    
+    def set_K(self,n):
+        global K
+        K = n
 
     def __init__(self, parent, controller):
-
+        global pid, LKp
         tk.Frame.__init__(self,parent)
-
+        LKp = pid.getKp()
 
         label = tk.Label(self, text = "Parametros de Control", font = LARGE_FONT)
         label.place(x = 450, y = 60, width = 600, height = 100)
@@ -329,25 +349,25 @@ class Parametros(tk.Frame):
         button1.place(x = 100, y = 65, width = 200, height = 80)
 
         button2 = ttk.Button(self, text = "Insertar Kp",
-                              command = lambda: controller.show_frame(Teclado), image = "")
+                              command = lambda: [controller.show_frame(Teclado),self.set_K(1)])
         button2.place(x = 250, y = 230, width = 300, height = 100)
 
         button3 = ttk.Button(self, text = "Insertar Ki",
-                              command = lambda: controller.show_frame(Teclado), image = "")
+                              command = lambda: [controller.show_frame(Teclado),self.set_K(2)])
         button3.place(x = 250, y = 400, width = 300, height = 100)
 
         button4 = ttk.Button(self, text = "Insertar Kd",
-                              command = lambda: controller.show_frame(Teclado), image = "")
+                              command = lambda: [controller.show_frame(Teclado),self.set_K(3)])
         button4.place(x = 250, y =570, width = 300, height = 100)
 
-        entry = tk.Entry(self, bg = "white", text = "kp")
-        entry.place(x = 600, y = 230, width = 200, height = 100)
+        label2 = tk.Label(self, bg = "white", text = str(pid.getKp()))
+        label2.place(x = 600, y = 230, width = 200, height = 100)
 
-        entry2 = tk.Entry(self, bg = "white", text = "ki")
-        entry2.place(x = 600, y = 400, width = 200, height = 100)
+        label3 = tk.Label(self, bg = "white", text = str(pid.getKi()))
+        label3.place(x = 600, y = 400, width = 200, height = 100)
 
-        entry3 = tk.Entry(self, bg = "white", text = "kd")
-        entry3.place(x = 600, y = 570, width = 200, height = 100)
+        label4 = tk.Label(self, bg = "white", text = str(pid.getKd()))
+        label4.place(x = 600, y = 570, width = 200, height = 100)
 
 
 class Perfiles(tk.Frame):
@@ -368,21 +388,34 @@ class Perfiles(tk.Frame):
 
 
 class Visual(tk.Frame):
-    global code
+    global code_enable
+    
+    def startcode(self):
+        global code_enable
+        try:
+            self.code.start()
+        except RuntimeError: 
+            print('RuntimeError')
+            code_enable = True
+    def Setcode_enable(self, f):
+        global code_enable
+        code_enable=f
     
     def __init__(self, parent, controller):
 
         tk.Frame.__init__(self,parent)
         
-        code = Code_thread()
-        code.daemon = True
+        self.code = Code_thread()
+        self.code.daemon = True
 
+        #button1 = ttk.Button(self, text = "Atrás",
+        #                      command = lambda: [code.kill(),DAC.set_voltage(0),controller.show_frame(Principal)], image = "")
         button1 = ttk.Button(self, text = "Atrás",
-                              command = lambda: [code.kill(),DAC.set_voltage(0),controller.show_frame(Principal)], image = "")
+                              command = lambda: [self.Setcode_enable(False),DAC.set_voltage(0),controller.show_frame(Principal)], image = "")
         button1.place(x = 100, y = 60, width = 200, height = 80)
         
         button2 = ttk.Button(self, text = "RUN",
-                              command = lambda: code.start(), image = "")
+                              command = lambda: self.startcode(), image = "")
         button2.place(x = 1100, y = 760, width = 200, height = 80)
 
         label = tk.Label(self, text = "Potencia del Emulador", font = LARGE_FONT)
@@ -400,7 +433,7 @@ class Visual(tk.Frame):
 
 
 class Teclado(tk.Frame):
-                                    
+                            
     def __init__(self, parent, controller):
 
         tk.Frame.__init__(self,parent)
@@ -417,13 +450,26 @@ class Teclado(tk.Frame):
         def button_clear():
 
             e.delete(0, tk.END)
-
+        
+        def K_selection():
+            global pid,LKp
+            if K == 1:
+                pid.setKp(e.get())
+                print ('Kp = ' + e.get())
+                
+            if K == 2:
+                pid.setKi(e.get())
+                print ('Ki = ' + e.get())
+            if K == 3:
+                pid.setKd(e.get())
+                print('Kd = '+ e.get())
+        
 
         label = tk.Label(self, text = "Insertar Constante", font = LARGE_FONT)
         label.place(x = 450, y = 60, width = 600, height = 70) 
 
         button1 = ttk.Button(self, text = "Confirmar valor",
-                              command = lambda: controller.show_frame(Parametros), image = "")
+                              command = lambda: [controller.show_frame(Parametros), K_selection()], image = "")
         button1.place(x = 900, y =600, width = 300, height = 100)
 
         button2 = ttk.Button(self, text = "Atrás",
@@ -480,6 +526,7 @@ class Teclado(tk.Frame):
 
 
 DAC = Adafruit_MCP4725.MCP4725(address=0x60, busnum=1)
+pid = PID(0.55,1,0.005)
 Interfaz = Emulador_UNIGRID()
 Interfaz.attributes('-zoomed', True)
 ani = animation.FuncAnimation(f, animate, interval = 100)
