@@ -134,10 +134,8 @@ class PID:
         """
         self.sample_time = sample_time
 
+
 def animate(i):
-    
-    #xList = t
-    #yList = DataPower
    
     a.clear()
     a.plot(t,DataPower)
@@ -281,13 +279,12 @@ class Principal(tk.Frame):
         button3.place(x = 900, y =600, width = 300, height = 100)
 
        
-
-
 class Parametros(tk.Frame):
 
     def __init__(self, parent, controller):
 
         tk.Frame.__init__(self,parent)
+
 
         label = tk.Label(self, text = "Parametros de Control", font = LARGE_FONT)
         label.place(x = 450, y = 60, width = 600, height = 100)
@@ -308,6 +305,14 @@ class Parametros(tk.Frame):
                               command = lambda: controller.show_frame(Teclado), image = "")
         button4.place(x = 250, y =570, width = 300, height = 100)
 
+        entry = tk.Entry(self, bg = "white", text = "kp")
+        entry.place(x = 600, y = 230, width = 200, height = 100)
+
+        entry2 = tk.Entry(self, bg = "white", text = "ki")
+        entry2.place(x = 600, y = 400, width = 200, height = 100)
+
+        entry3 = tk.Entry(self, bg = "white", text = "kd")
+        entry3.place(x = 600, y = 570, width = 200, height = 100)
 
 
 class Perfiles(tk.Frame):
@@ -335,27 +340,24 @@ class Visual(tk.Frame):
 
         button1 = ttk.Button(self, text = "Atrás",
                               command = lambda: controller.show_frame(Principal), image = "")
-        button1.place(x = 100, y = 70, width = 200, height = 80)
+        button1.place(x = 100, y = 60, width = 200, height = 80)
         
-        button2 = ttk.Button(self, text = "Run",
+        button2 = ttk.Button(self, text = "RUN",
                               command = lambda: controller.StartEmulator(), image = "")
-        button2.place(x = 1000, y = 600, width = 200, height = 80)
+        button2.place(x = 1100, y = 760, width = 200, height = 80)
 
         label = tk.Label(self, text = "Potencia del Emulador", font = LARGE_FONT)
         label.place(x = 450, y = 60, width = 600, height = 70) 
 
-        label2 = tk.Label(self, text = "Potencia: ")
-        label2.place(x = 1000, y =400, width = 50, height = 50)
-
-        label3 = tk.Label(self, text = "Watts")
-        label3.place(x = 1050, y =400, width = 50, height = 50)
-
         canvas = FigureCanvasTkAgg(f,self)
         canvas.draw()
-        canvas.get_tk_widget().pack(side = "left", pady=200, padx=100)
+        canvas.get_tk_widget().pack(side = "bottom", pady=200, padx = 100, fill = "x")
 
+        label2 = tk.Label(self, text = " Nueva Consigna:", font = ("Verdana", 28))
+        label2.place(x = 100, y = 760, width = 350, height = 80)
 
-
+        entry = tk.Entry(self, font = ("Verdana", 28), bg = "white")
+        entry.place(x = 470, y = 760, width = 200, height = 80)
 
 
 class Teclado(tk.Frame):
@@ -363,6 +365,20 @@ class Teclado(tk.Frame):
     def __init__(self, parent, controller):
 
         tk.Frame.__init__(self,parent)
+
+        e = tk.Entry(self, bg = "white", font = LARGE_FONT)
+        e.place(x = 900, y = 280, width = 300, height = 100)
+
+        def button_click (number):
+
+            digito_anterior = e.get()
+            e.delete(0, tk.END)
+            e.insert(0, str(digito_anterior) + str(number))
+
+        def button_clear():
+
+            e.delete(0, tk.END)
+
 
         label = tk.Label(self, text = "Insertar Constante", font = LARGE_FONT)
         label.place(x = 450, y = 60, width = 600, height = 70) 
@@ -376,55 +392,54 @@ class Teclado(tk.Frame):
         button2.place(x = 100, y = 70, width = 200, height = 80)
         
         button3 = ttk.Button(self, text = "7",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(7))
         button3.place(x = 250, y = 280, width = 100, height = 100)
         
         button4 = ttk.Button(self, text = "8",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(8))
         button4.place(x = 350, y = 280, width = 100, height = 100) 
         
         button4 = ttk.Button(self, text = "9",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(9))
         button4.place(x = 450, y = 280, width = 100, height = 100)  
         
         button5 = ttk.Button(self, text = "4",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(4))
         button5.place(x = 250, y = 380, width = 100, height = 100) 
         
         button6 = ttk.Button(self, text = "5",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(5))
         button6.place(x = 350, y = 380, width = 100, height = 100)
         
         button7 = ttk.Button(self, text = "6",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(6))
         button7.place(x = 450, y = 380, width = 100, height = 100)  
         
         button8 = ttk.Button(self, text = "1",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(1))
         button8.place(x = 250, y = 480, width = 100, height = 100) 
         
         button9 = ttk.Button(self, text = "2",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(2))
         button9.place(x = 350, y = 480, width = 100, height = 100) 
         
         button10 = ttk.Button(self, text = "3",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(3))
         button10.place(x = 450, y = 480, width = 100, height = 100)
         
         button11 = ttk.Button(self, text = ".",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click('.'))
         button11.place(x = 250, y = 580, width = 100, height = 100)
         
         button11 = ttk.Button(self, text = "0",
-                              command = lambda: controller.show_frame(Principal))
+                              command = lambda: button_click(0))
         button11.place(x = 350, y = 580, width = 100, height = 100)  
         
         button11 = ttk.Button(self, text = "borrar",
-                              command = lambda: controller.show_frame(Principal))
+                              command = button_clear)
         button11.place(x = 450, y = 580, width = 100, height = 100) 
-        
-        label = tk.Label(self, text = "", bg = "white")
-        label.place(x = 900, y = 280, width = 300, height = 100)
+
+
 
 Interfaz = Emulador_UNIGRID()
 Interfaz.attributes('-fullscreen', True)
