@@ -22,6 +22,7 @@ import Adafruit_MCP4725
 
 import threading
 import time
+import sys
 
 LARGE_FONT= ("Verdana", 30)
 MEDIUM_FONT= ("Verdana", 15)
@@ -168,99 +169,126 @@ class Emulador_UNIGRID(tk.Tk):
         frame.tkraise()
     
 class Code_thread(threading.Thread):
+    global DAC
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.killed = False
+
+    def start(self): 
+        self.__run_backup = self.run 
+        self.run = self.__run       
+        threading.Thread.start(self) 
+      
+    def __run(self): 
+        sys.settrace(self.globaltrace) 
+        self.__run_backup() 
+        self.run = self.__run_backup 
+      
+    def globaltrace(self, frame, event, arg): 
+        if event == 'call': 
+          return self.localtrace 
+        else: 
+          return None
+      
+    def localtrace(self, frame, event, arg): 
+        if self.killed: 
+          if event == 'line': 
+            raise SystemExit() 
+        return self.localtrace 
+      
+    def kill(self): 
+        self.killed = True
+
+    def run(self):
+                    
+        #---------------------------------Inicializacion-----------------------------------------------------
+        # Create the I2C bus
+        i2c = busio.I2C(board.SCL, board.SDA)
         
-        def __init__(self):
-                threading.Thread.__init__(self)
+        # Create the ADC object using the I2C bus
+        ads = ADS.ADS1115(i2c)
 
-        def run(self):
-                        
-            #---------------------------------Inicializacion-----------------------------------------------------
-                # Create the I2C bus
-                i2c = busio.I2C(board.SCL, board.SDA)
-                
-                # Create the ADC object using the I2C bus
-                ads = ADS.ADS1115(i2c)
+        # Create single-ended input on channel 0
+        ch0 = AnalogIn(ads, ADS.P0)
+        ch3 = AnalogIn(ads, ADS.P3)
+        ch2 = AnalogIn(ads, ADS.P2)
 
-                # Create single-ended input on channel 0
-                ch0 = AnalogIn(ads, ADS.P0)
-                ch3 = AnalogIn(ads, ADS.P3)
-                ch2 = AnalogIn(ads, ADS.P2)
+        # Create differential input between channel 0 and 1
+        dif01 = AnalogIn(ads, ADS.P0, ADS.P1)
+        dif23 = AnalogIn(ads, ADS.P2, ADS.P3)
 
-                # Create differential input between channel 0 and 1
-                dif01 = AnalogIn(ads, ADS.P0, ADS.P1)
-                dif23 = AnalogIn(ads, ADS.P2, ADS.P3)
+        ads.gain = 2/3
+        ads.data_rate = 860
+         
+        # Create a DAC instance.
+        
+        
+        # Create Current and Voltage Filters
+        VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
+        CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
+        #PIDFilter = IIR2Filter(1,[20],'lowpass','butter',fs=1000)
+    #--------------------------------------------------------------------------------------------------
 
-                ads.gain = 2/3
-                ads.data_rate = 860
-                 
-                # Create a DAC instance.
-                DAC = Adafruit_MCP4725.MCP4725(address=0x60, busnum=1)
-                
-                # Create Current and Voltage Filters
-                VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
-                CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
-                #PIDFilter = IIR2Filter(1,[20],'lowpass','butter',fs=1000)
-            #--------------------------------------------------------------------------------------------------
+        
+        start = time.time()
 
-                
-                start = time.time()
+    #-----------------------------------------PID SETUP-----------------------------------------------
+        #pid = PID(0.55,0.9,0.005)
+        pid = PID(0.55,1,0.005)
+        pid.SetPoint=20
+        pid.setSampleTime(0.001)
+        feedback = 0
+        feedback_list = []
+        time_list = []
 
-            #-----------------------------------------PID SETUP-----------------------------------------------
-                #pid = PID(0.55,0.9,0.005)
-                pid = PID(0.55,1,0.005)
+        pidmin = 0 
+        pidmax = 5
+    # -----------------------------------------------------------------------------------------------
+
+        voltajedac = 0
+        DAC.set_voltage(voltajedac)
+        i=0;
+    #------------------------------------- MAIN LOOP--------------------------------------------------    
+        while True:
+            Current = ch0.voltage
+            Voltage = ch3.voltage
+        #-----------------------------------------IRR FILTER----------------------------------------------
+            DataVoltage.append(VolFilter.filter(Voltage))
+            DataCurrent.append(CurFilter.filter(Current))     
+        #-------------------------------------------------------------------------------------------------
+            timenow=(time.time()-start)
+            t.append(timenow)
+            
+            if (timenow > 0 and timenow < 15):
                 pid.SetPoint=20
-                pid.setSampleTime(0.001)
-                feedback = 0
-                feedback_list = []
-                time_list = []
-
-                pidmin = 0 
-                pidmax = 5
-            # -----------------------------------------------------------------------------------------------
-
-                voltajedac = 0
-                DAC.set_voltage(voltajedac)
-                i=0;
-            #------------------------------------- MAIN LOOP--------------------------------------------------    
-                while True:
-                    Current = ch0.voltage
-                    Voltage = ch3.voltage
-                #-----------------------------------------IRR FILTER----------------------------------------------
-                    DataVoltage.append(VolFilter.filter(Voltage))
-                    DataCurrent.append(CurFilter.filter(Current))     
-                #-------------------------------------------------------------------------------------------------
-                    timenow=(time.time()-start)
-                    t.append(timenow)
-                    
-                    if (timenow > 0 and timenow < 15):
-                        pid.SetPoint=20
-                    elif (timenow > 15 and timenow < 30):
-                        pid.SetPoint=30
-                    elif (timenow > 30 ):
-                        pid.SetPoint=10
-                        
-                    DataVoltage[i]=DataVoltage[i]*9.5853-0.1082
-                    DataCurrent[i]=DataCurrent[i]*1.4089+0.1326
-                    
-                    DataPower.append(DataVoltage[i]*DataCurrent[i])
-                # --------------------------------------- PID CONTROLLER------------------------------------------
-                    pid.update(DataPower[i])
-                    output = pid.output
-                    
-                    if pid.SetPoint > 0:
-                        voltajedac = voltajedac + (output - (1/(i+1)))
-                    
-                    if voltajedac < pidmin:
-                        voltajedac = pidmin
-                    elif voltajedac > pidmax:
-                        voltajedac = pidmax
-                # ---------------------------------------------DAC------------------------------------------------
-                    voltbits=int((4096/5)*voltajedac)
-                    DAC.set_voltage(voltbits)    
-                  
-                # ------------------------------------------------------------------------------------------------   
-                    #print("| {0:^5.3f} | {1:^5.3f} | {2:^5.3f} |".format(DataCurrent[i],DataVoltage[i],DataPower[i]))
-                    i = i+1
+            elif (timenow > 15 and timenow < 30):
+                pid.SetPoint=30
+            elif (timenow > 30 ):
+                pid.SetPoint=10
+                
+            DataVoltage[i]=DataVoltage[i]*9.5853-0.1082
+            DataCurrent[i]=DataCurrent[i]*1.4089+0.1326
+            
+            DataPower.append(DataVoltage[i]*DataCurrent[i])
+        # --------------------------------------- PID CONTROLLER------------------------------------------
+            pid.update(DataPower[i])
+            output = pid.output
+            
+            if pid.SetPoint > 0:
+                voltajedac = voltajedac + (output - (1/(i+1)))
+            
+            if voltajedac < pidmin:
+                voltajedac = pidmin
+            elif voltajedac > pidmax:
+                voltajedac = pidmax
+        # ---------------------------------------------DAC------------------------------------------------
+            voltbits=int((4096/5)*voltajedac)
+            DAC.set_voltage(voltbits)    
+          
+        # ------------------------------------------------------------------------------------------------   
+            #print("| {0:^5.3f} | {1:^5.3f} | {2:^5.3f} |".format(DataCurrent[i],DataVoltage[i],DataPower[i]))
+            i = i+1
+        
 
 
 class Principal(tk.Frame):
@@ -340,15 +368,17 @@ class Perfiles(tk.Frame):
 
 
 class Visual(tk.Frame):
-
+    global code
+    
     def __init__(self, parent, controller):
 
         tk.Frame.__init__(self,parent)
         
-        code = Code_thread();
+        code = Code_thread()
+        code.daemon = True
 
         button1 = ttk.Button(self, text = "Atrás",
-                              command = lambda: controller.show_frame(Principal), image = "")
+                              command = lambda: [code.kill(),DAC.set_voltage(0),controller.show_frame(Principal)], image = "")
         button1.place(x = 100, y = 60, width = 200, height = 80)
         
         button2 = ttk.Button(self, text = "RUN",
@@ -449,7 +479,7 @@ class Teclado(tk.Frame):
         button11.place(x = 450, y = 580, width = 100, height = 100) 
 
 
-
+DAC = Adafruit_MCP4725.MCP4725(address=0x60, busnum=1)
 Interfaz = Emulador_UNIGRID()
 Interfaz.attributes('-zoomed', True)
 ani = animation.FuncAnimation(f, animate, interval = 100)
