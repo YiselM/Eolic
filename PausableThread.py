@@ -175,7 +175,7 @@ class Emulador_UNIGRID(tk.Tk):
         frame = self.frames[cont]
         frame.tkraise()
     
-class Code_thread(continuous_threading.ContinuousThread):
+class Code_thread(continuous_threading.PausableThread):
     global DAC
     def __init__(self):
         super().__init__()
