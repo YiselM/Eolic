@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import os
 import time
 import board
@@ -136,9 +130,9 @@ class PID:
         self.sample_time = sample_time
 
 #----------------------------------------FILTER SETUP----------------------------------------------
-VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
-CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
-PIDFilter = IIR2Filter(1,[20],'lowpass','butter',fs=1000)
+VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=2000)
+CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=2000)
+#PIDFilter = IIR2Filter(1,[20],'lowpass','butter',fs=1000)
 #--------------------------------------------------------------------------------------------------
 filteredVol = []
 filteredCur = []
@@ -164,140 +158,196 @@ pidmin = 0
 pidmax = 5
 # -----------------------------------------------------------------------------------------------
 
+global voltajedac
 voltajedac = 0
 DAC.set_voltage(voltajedac)        
-
-
-# In[ ]:
 
 
 import threading
 import time
 
+flagcur = False
+flagvol = False
+curlist = []
+vollist = []
+powlist = []
 start = time.time()
 
-class myThread1 (threading.Thread):
+# class myThread1 (threading.Thread):
 
-    def __init__(self, threadID, name, counter):
-        threading.Thread.__init__(self)
-        self.threadID = threadID
-        self.name = name
-        self.counter = counter
+    # def __init__(self, threadID, name, counter):
+        # threading.Thread.__init__(self)
+        # self.threadID = threadID
+        # self.name = name
+        # self.counter = counter
 
-    def run(self):
-        run_emulator(self.name, 0.001, self.counter)
+    # def run(self):
+       # # print("Starting " + self.name + "\n")
+        # run_emulator(self.name, 0.000001, self.counter)
+        # #print("Exiting " + self.name + "\n")
 
-class myThread2 (threading.Thread):
+# class myThread2 (threading.Thread):
 
-    def __init__(self, threadID, name, counter):
+    # def __init__(self, threadID, name, counter):
 
-        threading.Thread.__init__(self)
-        self.threadID = threadID
-        self.name = name
-        self.counter = counter
+        # threading.Thread.__init__(self)
+        # self.threadID = threadID
+        # self.name = name
+        # self.counter = counter
 
-    def run(self):
-        run_emulator(self.name, 0.001, self.counter)
+    # def run(self):
+        # #print ("Starting " + self.name + "\n")
+        # run_emulator(self.name, 0.000001, self.counter)        
+        # #print ("Exiting " + self.name + "\n")
 
-class myThread3 (threading.Thread):
+# class myThread3 (threading.Thread):
 
-    def __init__(self, threadID, name, counter):
+    # def __init__(self, threadID, name, counter):
 
-        threading.Thread.__init__(self)
-        self.threadID = threadID
-        self.name = name
-        self.counter = counter
+        # threading.Thread.__init__(self)
+        # self.threadID = threadID
+        # self.name = name
+        # self.counter = counter
 
-    def run(self):
-        run_emulator(self.name, 0.001, self.counter)
+    # def run(self):
+        # #print ("Starting " + self.name + "\n")
+        # run_emulator(self.name, 0.000001, self.counter)        
+        # #print ("Exiting " + self.name + "\n")
 
-def run_emulator(threadName, delay, counter):
-    global voltajedac
-    while True:
-        time.sleep(delay)
-        if threadName=="Midiendo y Filtrando Corriente":
-            print("CUR")
-            try:
-                Current = ch0.voltage
-                DataCurrent.append(CurFilter.filter(Current))
-                DataCurrent[counter]=DataCurrent[counter]*1.4089+0.1326
-            except IOError:
-                print ("IO ERROR")
-                counter-=1            
-        elif threadName=="Midiendo y Filtrando Voltaje":
-            print("VOL")
-            try:
-                Voltage = ch3.voltage
-                DataVoltage.append(VolFilter.filter(Voltage))
-                DataVoltage[counter]=DataVoltage[counter]*9.5853-0.1082
-            except IOError:
-                print ("IO ERROR")
-                counter-=1
-        elif threadName=="Realizando PID":
-            try:
-                DataPower.append(DataVoltage[counter]*DataCurrent[counter])                
-                timenow=(time.time()-start)
-                t.append(timenow)
-                
-                if (timenow > 0 and timenow < 15):
-                    pid.SetPoint=20
-                elif (timenow > 15 and timenow < 30):
-                    pid.SetPoint=30
-                elif (timenow > 30 ):
-                    pid.SetPoint=10
-                
-                # --------------------------------------- PID CONTROLLER------------------------------------------
-                pid.update(DataPower[counter])
-                output = pid.output
+def curr_ad():
+	global flagcur,flagvol, DataCurrent
+	delay = 0.000001
+	counter = 0
+	while True:
+		time.sleep(delay)
+		print("CUR")
+		try:
+			Current = ch0.voltage
+			DataCurrent.append(CurFilter.filter(Current))
+			DataCurrent[counter]=DataCurrent[counter]*1.4089+0.1326
+			flagcur=True
+			counter+=1
+		except IOError:
+			print ("IO ERROR")
+		#print("%s: %s %s" % (threadName, time.ctime(time.time()), counter)+"\n")
+		#print("Corriente: "+str(DataCurrent[counter])+"\n")
 
-                if pid.SetPoint > 0:
-                    voltajedac = voltajedac + (output - (1/(counter+1)))
-                if voltajedac < pidmin:
-                    voltajedac = pidmin
-                elif voltajedac > pidmax:
-                    voltajedac = pidmax
-                # ---------------------------------------------DAC------------------------------------------------
 
-                DataOut.append(PIDFilter.filter(voltajedac))
-                voltbits=int((4096/5)*voltajedac)
-                DAC.set_voltage(voltbits)    
-    
-                # ------------------------------------------------------------------------------------------------
-                print(str(counter)+" Potencia: "+str(DataPower[counter])+" "+str(time.time()-start)+"\n")
-            except IndexError:
-                print("IndexError \n")
-                counter-=1
-        counter+=1
+def vol_ad(): 
+	global flagcur,flagvol, DataVoltage
+	delay = 0.000001
+	counter = 0
+	while True: 
+		time.sleep(delay)
+		print("VOL")
+		try:
+			Voltage = ch3.voltage
+			DataVoltage.append(VolFilter.filter(Voltage))
+			DataVoltage[counter]=DataVoltage[counter]*9.5853-0.1082
+			flagvol=True
+			counter+=1
+		except IOError:
+			print ("IO ERROR")				   
+		#print("%s: %s %s" % (threadName, time.ctime(time.time()), counter)+"\n")
+		#print("Voltaje: "+str(DataVoltage[counter])+"\n")
 
+def pid_fun():
+				   
+	global flagcur,flagvol,voltajedac, DataCurrent, DataVoltage, DataPower
+	delay = 0.00001
+	counter = 0
+	i=0
+	while True:
+		time.sleep(delay)
+		if (flagcur==True and flagvol==True):
+			print("counter pid: "+str(counter)+"\n")
+			DataPower.append(DataVoltage[counter]*DataCurrent[counter])
+			timenow=(time.time()-start)
+			t.append(timenow)
+			if (timenow > 0 and timenow < 15):
+				pid.SetPoint=20
+			elif (timenow > 15 and timenow < 30):
+				pid.SetPoint=30
+			elif (timenow > 30 ):
+				pid.SetPoint=10
+			# --------------------------------------- PID CONTROLLER------------------------------------------
+			# pid.update(DataPower[counter])
+			# output = pid.output
+
+			# if pid.SetPoint > 0:
+				# voltajedac = voltajedac + (output - (1/(counter+1)))
+			# if voltajedac < pidmin:
+				# voltajedac = pidmin
+			# elif voltajedac > pidmax:
+				# voltajedac = pidmax
+			# # ---------------------------------------------DAC------------------------------------------------
+			
+			# DataOut.append(PIDFilter.filter(voltajedac))
+			voltajedac = 3
+			voltbits=int((4096/5)*voltajedac)
+			DAC.set_voltage(voltbits)    
+
+			# ------------------------------------------------------------------------------------------------
+			
+			print(str(counter)+" Potencia: "+str(DataPower[counter])+" "+str((time.time()-start)*1000)+"\n")
+			flagcur=False
+			flagvol=False
+			counter+=1
+		else:
+			time.sleep(0.00001)
+			print("ELSE "+str(i))
+			i+=1
+			pass
+      
         
-        
-threadLock = threading.Lock()
+#threadLock = threading.Lock()
 
 # Create new threads
 
-thread1 = myThread1(1, "Midiendo y Filtrando Corriente", 0)
-thread2 = myThread2(2,"Midiendo y Filtrando Voltaje", 0)
+thread1 = threading.Thread(target=curr_ad)
+thread2 = threading.Thread(target=vol_ad)
+thread3 = threading.Thread(target=pid_fun)
 
-thread3 = myThread1(3,"Realizando PID", 0)
+# # Start new threads
 
+# thread3.start()
 
-# Start new threads
-#thread1.start()
-#thread2.start()
-thread3.start()
+# threadLock.acquire()
+# thread1.start()
+# thread2.start()
+# thread1.join()
+# thread2.join()
+# threadLock.release()
 
-threadLock.acquire()
+# thread3.join()
+
 thread1.start()
 thread2.start()
-thread1.join()
-thread2.join()
-threadLock.release()
+thread3.start()
+# while True:
+	# time.sleep(0.00000001)
+# thread1.join()
+# thread2.join()
+# thread3.join()
 
-thread3.join()
-#threadLock.acquire()
-#threadLock.release()
-#thread3.start()
+# plt.subplot(1,2,1)
+# plt.plot(t,DataVoltage)
+# plt.title('Data')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Voltage (V)')
+# plt.ylim(0,60)
+# plt.subplot(1,2,2)
+# plt.plot(t,DataCurrent)
+# plt.title('Data')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Current (I)')
+# plt.ylim(0,60)
 
+# plt.figure(1)
+# plt.plot(t,DataPower)
+# plt.title('Data')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Power (W)')
+# plt.ylim(0,60)
 
 print ("Exiting Main Thread")
-

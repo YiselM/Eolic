@@ -15,8 +15,6 @@ class PID:
         self.Kp = P
         self.Ki = I
         self.Kd = D
-        self.max = 5
-        self.min = 0
 
         self.sample_time = 0.01
         self.current_time = current_time if current_time is not None else time.time()
@@ -125,18 +123,31 @@ time_list = []
 pidmin = 0 
 pidmax = 5
 
+voltajedac = 0
+DAC.set_voltage(voltajedac)
+
 for i in range(1, 1000):
-    pid.update(feedback)
+    
+    # filtrado y arroja potencia
+    
+    
+    pid.update(datapower[i])    
     output = pid.output
+    
     if pid.SetPoint > 0:
-        feedback += (output - (1/i))
-    if feedback < pidmin:
-        feedback = pidmin
-    elif feedback > pidmax:
-        feedback = pidmax
+        voltajedac = voltajedac + (output - (1/i)
+                
+    if voltajedac < pidmin:
+        voltajedac = pidmin
+    elif voltajedac > pidmax:
+        voltajedac = pidmax
+        
+    DAC.set_voltage(voltajedac)
+    
     time.sleep(0.01)
-    feedback_list.append(feedback)
+    feedback_list.append(voltajedac)
     time_list.append(i)
+    
 plt.plot(time_list, feedback_list)
 plt.show()
 

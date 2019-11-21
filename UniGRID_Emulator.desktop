@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Emulador UniGRID
+Version=v1.0
+Icon=/home/pi/Desktop/Eolic_Emulator_Control/eolicimg.png
+Exec=python3 Emulador_UNIGRID.py
+Path=/home/pi/Desktop/Eolic_Emulator_Control/
+Terminal=false
+Type=Application

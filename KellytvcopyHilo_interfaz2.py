@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -27,7 +21,6 @@ from IIR2Filter import IIR2Filter
 import Adafruit_MCP4725
 
 import threading
-import continuous_threading
 import time
 import sys
 
@@ -36,7 +29,10 @@ MEDIUM_FONT= ("Verdana", 15)
 style.use("ggplot")
 
 f = Figure(figsize=(7,4.5), dpi=100)
+plt.ylim(0,100)
 a = f.add_subplot(111)
+
+
 
 filteredVol = []
 filteredCur = []
@@ -46,6 +42,8 @@ DataCurrent = []
 DataPower = []
 DataOut = []
 t = []
+consigna = []
+mode = 'Test'
 
 
 class PID:
@@ -148,7 +146,9 @@ class PID:
 def animate(i):
 
     a.clear()
-    a.plot(t,DataPower)
+    a.plot(t,DataPower,'r',t,consigna,'b')
+    a.set_ylim(0,70)
+    
 
 
 class Emulador_UNIGRID(tk.Tk):
@@ -175,89 +175,133 @@ class Emulador_UNIGRID(tk.Tk):
         frame = self.frames[cont]
         frame.tkraise()
     
-class Code_thread(continuous_threading.PausableThread):
-    global DAC
-    def __init__(self):
-        super().__init__()
-        #---------------------------------Inicializacion-----------------------------------------------------
-        # Create the I2C bus
-        self.i2c = busio.I2C(board.SCL, board.SDA)
+class Code_thread(threading.Thread):
         
-        # Create the ADC object using the I2C bus
-        self.ads = ADS.ADS1115(self.i2c)
-
-        # Create single-ended input on channel 0
-        self.ch0 = AnalogIn(self.ads, ADS.P0)
-        self.ch3 = AnalogIn(self.ads, ADS.P3)
-        self.ch2 = AnalogIn(self.ads, ADS.P2)
-
-        self.ads.gain = 2/3
-        self.ads.data_rate = 860
-       
-        # Create Current and Voltage Filters
-        self.VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
-        self.CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
-    #--------------------------------------------------------------------------------------------------
-       
-        self.start = time.time()
-
-    #-----------------------------------------PID SETUP-----------------------------------------------
-        #pid = PID(0.55,0.9,0.005)
-        self.pid = PID(0.55,1,0.005)
-        self.pid.SetPoint=20
-        self.pid.setSampleTime(0.001)
-
-        self.pidmin = 0 
-        self.pidmax = 5
-    # -----------------------------------------------------------------------------------------------
-
-        self.voltajedac = 0
-        DAC.set_voltage(self.voltajedac)
-        self.i=0
-
-    def run(self):
-        global DataVoltage, DataCurrent, DataPower, t, DAC         
-       
-        #------------------------------------- MAIN LOOP--------------------------------------------------    
-        #while True:
-        Current = self.ch0.voltage
-        Voltage = self.ch3.voltage
-    #-----------------------------------------IRR FILTER----------------------------------------------
-        DataVoltage.append(VolFilter.filter(Voltage))
-        DataCurrent.append(CurFilter.filter(Current))     
-    #-------------------------------------------------------------------------------------------------
-        timenow=(time.time()-self.start)
-        t.append(timenow)
-
-        if (timenow > 0 and timenow < 15):
-            self.pid.SetPoint=20
-        elif (timenow > 15 and timenow < 30):
-            self.pid.SetPoint=30
-        elif (timenow > 30 ):
-            self.pid.SetPoint=10
-
-        DataVoltage[i]=DataVoltage[i]*9.5853-0.1082
-        DataCurrent[i]=DataCurrent[i]*1.4089+0.1326
-
-        DataPower.append(DataVoltage[i]*DataCurrent[i])
-    # --------------------------------------- PID CONTROLLER------------------------------------------
-        self.pid.update(DataPower[i])
-        output = self.pid.output
-
-        if self.pid.SetPoint > 0:
-            self.voltajedac = self.voltajedac + (output - (1/(i+1)))
-
-        if self.voltajedac < self.pidmin:
-            self.voltajedac = self.pidmin
-        elif self.voltajedac > self.pidmax:
-            self.voltajedac = self.pidmax
-    # ---------------------------------------------DAC------------------------------------------------
-        voltbits=int((4096/5)*self.voltajedac)
-        DAC.set_voltage(voltbits)    
+        def __init__(self):
+            threading.Thread.__init__(self)
+            self.i=0 
+            self.killed = False 
+            
+        def start(self): 
+            self.__run_backup = self.run 
+            self.run = self.__run       
+            threading.Thread.start(self) 
+      
+        def __run(self): 
+            sys.settrace(self.globaltrace) 
+            self.__run_backup() 
+            self.run = self.__run_backup 
           
-        # ------------------------------------------------------------------------------------------------   
-        self.i+=1
+        def globaltrace(self, frame, event, arg): 
+            if event == 'call': 
+              return self.localtrace 
+            else: 
+              return None
+          
+        def localtrace(self, frame, event, arg): 
+            if self.killed: 
+              if event == 'line': 
+                raise SystemExit() 
+            return self.localtrace 
+          
+        def kill(self): 
+            self.killed = True
+
+        def seti(self,i):
+            self.i = i        
         
+        def run(self):
+            global DAC, mode
+                        
+            #---------------------------------Inicializacion-----------------------------------------------------
+            # Create the I2C bus
+            i2c = busio.I2C(board.SCL, board.SDA)
+            
+            # Create the ADC object using the I2C bus
+            ads = ADS.ADS1115(i2c)
+
+            # Create single-ended input on channel 0
+            ch0 = AnalogIn(ads, ADS.P0)
+            ch3 = AnalogIn(ads, ADS.P3)
+            ch2 = AnalogIn(ads, ADS.P2)
+
+            # Create differential input between channel 0 and 1
+            dif01 = AnalogIn(ads, ADS.P0, ADS.P1)
+            dif23 = AnalogIn(ads, ADS.P2, ADS.P3)
+
+            ads.gain = 2/3
+            ads.data_rate = 860
+            
+            # Create Current and Voltage Filters
+            VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
+            CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
+        #--------------------------------------------------------------------------------------------------
+
+            
+            starttime = time.time()
+
+        #-----------------------------------------PID SETUP-----------------------------------------------
+            #pid = PID(0.55,0.9,0.005)
+            pid = PID(0.55,1,0.01)
+            pid.SetPoint=20
+            pid.setSampleTime(0.001)
+            feedback = 0
+            feedback_list = []
+            time_list = []
+
+            pidmin = 0 
+            pidmax = 5
+        # -----------------------------------------------------------------------------------------------
+
+            voltajedac = 0
+            DAC.set_voltage(voltajedac)
+            
+        #------------------------------------- MAIN LOOP--------------------------------------------------    
+            while True:
+                try:
+                    print('aqui')
+                    Current = ch0.voltage
+                    Voltage = ch3.voltage
+                #-----------------------------------------IRR FILTER----------------------------------------------
+                    DataVoltage.append(VolFilter.filter(Voltage))
+                    DataCurrent.append(CurFilter.filter(Current))     
+                #-------------------------------------------------------------------------------------------------
+                    timenow=(time.time()-starttime)
+                    t.append(timenow)
+                    if mode == 'Test':
+                        if (timenow > 0 and timenow < 15):
+                            pid.SetPoint=20
+                        elif (timenow > 15 and timenow < 30):
+                            pid.SetPoint=30
+                        elif (timenow > 30 ):
+                            pid.SetPoint=10
+                    consigna.append(pid.SetPoint)
+                    DataVoltage[self.i]=DataVoltage[self.i]*9.5853-0.1082
+                    DataCurrent[self.i]=DataCurrent[self.i]*1.4089+0.1326
+                    
+                    DataPower.append(DataVoltage[self.i]*DataCurrent[self.i])
+                # --------------------------------------- PID CONTROLLER------------------------------------------
+                    pid.update(DataPower[self.i])
+                    output = pid.output
+                    
+                    if pid.SetPoint > 0:
+                        voltajedac = voltajedac + (output - (1/(self.i+1)))
+                    
+                    if voltajedac < pidmin:
+                        voltajedac = pidmin
+                    elif voltajedac > pidmax:
+                        voltajedac = pidmax
+                # ---------------------------------------------DAC------------------------------------------------
+                    voltbits=int((4096/5)*voltajedac)
+                    DAC.set_voltage(voltbits)    
+                  
+                # ------------------------------------------------------------------------------------------------   
+                    #print("| {0:^5.3f} | {1:^5.3f} | {2:^5.3f} |".format(DataCurrent[i],DataVoltage[i],DataPower[i]))
+                    self.i = self.i+1
+                except IOError:
+                    print('IOError')
+
+
 class Principal(tk.Frame):
 
     def __init__(self, parent, controller):
@@ -265,20 +309,21 @@ class Principal(tk.Frame):
         tk.Frame.__init__(self,parent)
 
         label = tk.Label(self, text = "Emulador Eolico UNIGRID", font = LARGE_FONT)
-        label.place(x = 450, y = 60, width = 600, height = 100)
+        label.place(x = 225, y = 60, width = 300, height = 500)
 
 
         button1 = ttk.Button(self, text = "Parametros de Control",
                               command = lambda: controller.show_frame(Parametros))
-        button1.place(x = 200, y = 250, width = 400, height = 100)
+        button1.place(x = 100, y = 125, width = 200, height = 50)
 
         button2 = ttk.Button(self, text = "Cargar Perfiles de Viento",
                               command = lambda: controller.show_frame(Perfiles))
-        button2.place(x = 200, y = 450, width = 400, height = 100)
+        button2.place(x = 100, y = 225, width = 200, height = 50)
 
         button3 = ttk.Button(self, text = "Iniciar",
                               command = lambda: controller.show_frame(Visual))
-        button3.place(x = 900, y =600, width = 300, height = 100)
+        button3.place(x = 350, y =200, width = 150, height = 50)
+
        
 class Parametros(tk.Frame):
 
@@ -286,33 +331,34 @@ class Parametros(tk.Frame):
 
         tk.Frame.__init__(self,parent)
 
+
         label = tk.Label(self, text = "Parametros de Control", font = LARGE_FONT)
-        label.place(x = 450, y = 60, width = 600, height = 100)
+        label.place(x = 225, y = 30, width = 300, height = 50)
 
         button1 = ttk.Button(self, text = "Atrás",
                               command = lambda: controller.show_frame(Principal))
-        button1.place(x = 100, y = 65, width = 200, height = 80)
+        button1.place(x = 50, y = 32, width = 100, height = 40)
 
         button2 = ttk.Button(self, text = "Insertar Kp",
                               command = lambda: controller.show_frame(Teclado), image = "")
-        button2.place(x = 250, y = 230, width = 300, height = 100)
+        button2.place(x = 125, y = 115, width = 150, height = 50)
 
         button3 = ttk.Button(self, text = "Insertar Ki",
                               command = lambda: controller.show_frame(Teclado), image = "")
-        button3.place(x = 250, y = 400, width = 300, height = 100)
+        button3.place(x = 125, y = 200, width = 150, height = 50)
 
         button4 = ttk.Button(self, text = "Insertar Kd",
                               command = lambda: controller.show_frame(Teclado), image = "")
-        button4.place(x = 250, y =570, width = 300, height = 100)
+        button4.place(x = 125, y =285, width = 150, height = 50)
 
         entry = tk.Entry(self, bg = "white", text = "kp")
-        entry.place(x = 600, y = 230, width = 200, height = 100)
+        entry.place(x = 300, y = 115, width = 100, height = 50)
 
         entry2 = tk.Entry(self, bg = "white", text = "ki")
-        entry2.place(x = 600, y = 400, width = 200, height = 100)
+        entry2.place(x = 300, y = 200, width = 100, height = 50)
 
         entry3 = tk.Entry(self, bg = "white", text = "kd")
-        entry3.place(x = 600, y = 570, width = 200, height = 100)
+        entry3.place(x = 300, y = 285, width = 100, height = 50)
 
 
 class Perfiles(tk.Frame):
@@ -322,46 +368,52 @@ class Perfiles(tk.Frame):
         tk.Frame.__init__(self,parent)
 
         label = tk.Label(self, text = "Perfiles de Viento", font = LARGE_FONT)
-        label.place(x = 450, y = 60, width = 600, height = 100) 
+        label.place(x = 225, y = 30, width = 300, height = 50) 
 
         label2 = tk.Label(self, text = "Fuente", anchor = "w", padx = 200, font = MEDIUM_FONT, bg = "red", fg = "white")
-        label2.place(x = 0, y = 200, width = 1360, height = 100) 
+        label2.place(x = 0, y = 100, width = 680, height = 25) 
 
         button1 = ttk.Button(self, text = "Atrás",
                               command = lambda: controller.show_frame(Principal))
-        button1.place(x = 100, y = 65, width = 200, height = 80)
+        button1.place(x = 50, y = 32, width = 100, height = 40)
 
 
 class Visual(tk.Frame):
     
+    def cleargraph(self):
+        a.clear()
+        filteredVol.clear()
+        filteredCur.clear()
+        DataVoltage.clear()
+        DataCurrent.clear()
+        DataPower.clear()
+        t.clear()
+        code.seti(0)    
+
     def __init__(self, parent, controller):
         global DAC
-
         tk.Frame.__init__(self,parent)
         
-        code = Code_thread()
-        code.daemon = True
+        self.code = Code_thread()
+        self.code.daemon = True        
 
         button1 = ttk.Button(self, text = "Atrás",
-                              command = lambda: [code.stop(),DAC.set_voltage(0),controller.show_frame(Principal)], image = "")
-        button1.place(x = 100, y = 60, width = 200, height = 80)
+                              command = lambda: [DAC.set_voltage(0),controller.show_frame(Principal)], image = "")
+        button1.place(x = 50, y = 30, width = 100, height = 40)
         
-        button2 = ttk.Button(self, text = "RUN", command = lambda: code.start(), image = "")
+        button2 = ttk.Button(self, text = "Start",
+                              command = lambda: [self.code.start()], image = "")
+        button2.place(x = 400, y = 30, width = 100, height = 40)
         
-        button2.place(x = 1100, y = 760, width = 200, height = 80)
-
-        label = tk.Label(self, text = "Potencia del Emulador", font = LARGE_FONT)
-        label.place(x = 450, y = 60, width = 600, height = 70) 
-
+        button3 = ttk.Button(self, text = "Stop",
+                              command = [print('presionó stop'),DAC.set_voltage(0),self.code.kill()], image = "")
+        button3.place(x = 550, y = 30, width = 100, height = 40)
+        
         canvas = FigureCanvasTkAgg(f,self)
         canvas.draw()
-        canvas.get_tk_widget().pack(side = "bottom", pady=200, padx = 100, fill = "x")
+        canvas.get_tk_widget().pack(side = "bottom", pady=100, padx = 50, fill = "x")
 
-        label2 = tk.Label(self, text = " Nueva Consigna:", font = ("Verdana", 28))
-        label2.place(x = 100, y = 760, width = 350, height = 80)
-
-        entry = tk.Entry(self, font = ("Verdana", 28), bg = "white")
-        entry.place(x = 470, y = 760, width = 200, height = 80)
+        
 
 
 class Teclado(tk.Frame):
@@ -371,7 +423,7 @@ class Teclado(tk.Frame):
         tk.Frame.__init__(self,parent)
 
         e = tk.Entry(self, bg = "white", font = LARGE_FONT)
-        e.place(x = 900, y = 280, width = 300, height = 100)
+        e.place(x = 450, y = 140, width = 150, height = 50)
 
         def button_click (number):
 
@@ -383,69 +435,71 @@ class Teclado(tk.Frame):
 
             e.delete(0, tk.END)
 
+
         label = tk.Label(self, text = "Insertar Constante", font = LARGE_FONT)
-        label.place(x = 450, y = 60, width = 600, height = 70) 
+        label.place(x = 225, y = 30, width = 300, height = 35) 
 
         button1 = ttk.Button(self, text = "Confirmar valor",
                               command = lambda: controller.show_frame(Parametros), image = "")
-        button1.place(x = 900, y =600, width = 300, height = 100)
+        button1.place(x = 450, y =300, width = 150, height = 50)
 
         button2 = ttk.Button(self, text = "Atrás",
                               command = lambda: controller.show_frame(Principal))
-        button2.place(x = 100, y = 70, width = 200, height = 80)
+        button2.place(x = 50, y = 35, width = 100, height = 40)
         
         button3 = ttk.Button(self, text = "7",
                               command = lambda: button_click(7))
-        button3.place(x = 250, y = 280, width = 100, height = 100)
+        button3.place(x = 125, y = 140, width = 50, height = 50)
         
         button4 = ttk.Button(self, text = "8",
                               command = lambda: button_click(8))
-        button4.place(x = 350, y = 280, width = 100, height = 100) 
+        button4.place(x = 175, y = 140, width = 50, height = 50) 
         
         button4 = ttk.Button(self, text = "9",
                               command = lambda: button_click(9))
-        button4.place(x = 450, y = 280, width = 100, height = 100)  
+        button4.place(x = 225, y = 140, width = 50, height = 50)  
         
         button5 = ttk.Button(self, text = "4",
                               command = lambda: button_click(4))
-        button5.place(x = 250, y = 380, width = 100, height = 100) 
+        button5.place(x = 125, y = 190, width = 50, height = 50) 
         
         button6 = ttk.Button(self, text = "5",
                               command = lambda: button_click(5))
-        button6.place(x = 350, y = 380, width = 100, height = 100)
+        button6.place(x = 175, y = 190, width = 50, height = 50)
         
         button7 = ttk.Button(self, text = "6",
                               command = lambda: button_click(6))
-        button7.place(x = 450, y = 380, width = 100, height = 100)  
+        button7.place(x = 225, y = 190, width = 50, height = 50)  
         
         button8 = ttk.Button(self, text = "1",
                               command = lambda: button_click(1))
-        button8.place(x = 250, y = 480, width = 100, height = 100) 
+        button8.place(x = 125, y = 240, width = 50, height = 50) 
         
         button9 = ttk.Button(self, text = "2",
                               command = lambda: button_click(2))
-        button9.place(x = 350, y = 480, width = 100, height = 100) 
+        button9.place(x = 175, y = 240, width = 50, height = 50) 
         
         button10 = ttk.Button(self, text = "3",
                               command = lambda: button_click(3))
-        button10.place(x = 450, y = 480, width = 100, height = 100)
+        button10.place(x = 225, y = 240, width = 50, height = 50)
         
         button11 = ttk.Button(self, text = ".",
                               command = lambda: button_click('.'))
-        button11.place(x = 250, y = 580, width = 100, height = 100)
+        button11.place(x = 125, y = 290, width = 50, height = 50)
         
         button11 = ttk.Button(self, text = "0",
                               command = lambda: button_click(0))
-        button11.place(x = 350, y = 580, width = 100, height = 100)  
+        button11.place(x = 175, y = 290, width = 50, height = 50)  
         
         button11 = ttk.Button(self, text = "borrar",
                               command = button_clear)
-        button11.place(x = 450, y = 580, width = 100, height = 100) 
+        button11.place(x = 225, y = 290, width = 50, height = 50) 
 
 
+# Create a DAC instance.
 DAC = Adafruit_MCP4725.MCP4725(address=0x60, busnum=1)
 Interfaz = Emulador_UNIGRID()
-Interfaz.attributes('-zoomed', True)
+#Interfaz.attributes('-zoomed', True)
+#Interfaz.geometry('1024x500')
 ani = animation.FuncAnimation(f, animate, interval = 100)
 Interfaz.mainloop()
-

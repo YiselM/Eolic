@@ -51,13 +51,14 @@ start = time.time()
 
 #----------------------------------------FILTER SETUP----------------------------------------------
 VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
-CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
+CurFilter = IIR2Filter(2,[50],'lowpass','butter',fs=1000)
 
-voltajedac = 3
+voltajedac = 5
 voltbits=int((4096/5)*voltajedac)
 DAC.set_voltage(voltbits)
 
-time.sleep(2)
+time.sleep(3)
+start = time.time()
 for i in range(500):
     Current = ch0.voltage
     Voltage = ch3.voltage 
@@ -70,6 +71,33 @@ for i in range(500):
     print(str(i)+' '+str(Current))
 writecsv('PruebaFiltroCorriente.csv','t Corriente FiltroCorriente',t,DataCurrent,filteredCur)
 writecsv('PruebaFiltroVoltaje.csv','t Voltaje FiltroVoltaje',t,DataVoltage,filteredVol)
+
+plt.figure(0)
+
+plt.subplot(1,2,1)
+plt.plot(t,DataVoltage)
+plt.title('Data')
+plt.xlabel('Time (s)')
+plt.ylabel('Voltage (V)')
+plt.subplot(1,2,2)
+plt.plot(t,DataCurrent)
+plt.title('Data')
+plt.xlabel('Time (s)')
+plt.ylabel('Current (I)')
+
+plt.figure(1)
+plt.subplot(1,2,1)
+plt.plot(t,filteredVol)
+plt.title('Data')
+plt.xlabel('Time (s)')
+plt.ylabel('Voltage (V)')
+plt.subplot(1,2,2)
+plt.plot(t,filteredCur)
+plt.title('Data')
+plt.xlabel('Time (s)')
+plt.ylabel('Current (I)')
+
+plt.show()
 
 
 

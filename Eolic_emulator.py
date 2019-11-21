@@ -129,13 +129,10 @@ class PID:
         """
         self.sample_time = sample_time
         
-print("| {0:^5} | {1:^5} | {2:^5} | {3:^5} | {4:^5} |".format('t','V','I','FiltV','FiltI'))
-print('-' * 17)
 
 #----------------------------------------FILTER SETUP----------------------------------------------
 VolFilter = IIR2Filter(2,[5],'lowpass','butter',fs=1000)
 CurFilter = IIR2Filter(2,[200],'lowpass','butter',fs=1000)
-PIDFilter = IIR2Filter(1,[20],'lowpass','butter',fs=1000)
 #--------------------------------------------------------------------------------------------------
 filteredVol = []
 filteredCur = []

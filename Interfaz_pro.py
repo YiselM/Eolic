@@ -442,7 +442,7 @@ class Teclado(tk.Frame):
 
 
 Interfaz = Emulador_UNIGRID()
-Interfaz.attributes('-fullscreen', True)
+Interfaz.attributes('-zoomed', True)
 ani = animation.FuncAnimation(f, animate, interval = 100)
 Interfaz.mainloop()
 
