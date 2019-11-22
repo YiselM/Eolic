@@ -34,18 +34,22 @@ from PIL import Image, ImageTk
 
 import random
 
-LARGE_FONT= ("Verdana", 45,'bold')
-LARGE_FONT2= ("Verdana", 40)
-MEDIUM_FONT= ("Verdana", 20)
-SMALL_FONT= ("Verdana", 8)
+LARGE_FONT= ("Verdana", 35,'bold')
+LARGE_FONT2= ("Verdana", 30)
+MEDIUM_FONT= ("Verdana", 10)
+SMALL_FONT= ("Verdana", 4)
 
 ColorTitulo = '#DE0002'
 style.use("ggplot")
 
-f = Figure(figsize=(12,5.5), dpi=100, facecolor= "snow")
+f = Figure(figsize=(12,7.7), dpi=100, facecolor= "snow")
+
 plt.ylim(0,100)
 a = f.add_subplot(111)
-
+pos1=a.get_position()
+pos=[pos1.x0,pos1.y0-0.05,pos1.width,pos1.height-0.05]
+a.set_position(pos)
+       
 
 
 filteredVol = []
@@ -171,12 +175,20 @@ def animate(i):
     try:
         a.clear()
         a.plot(t,DataPower,'r',t,consigna,'b')
-        a.set_ylim(0,70)
+        a.set_ylim(0,60)
         a.set_xlim(left=0) 
-        a.set_xlabel('Tiempo (s)')
-        a.set_ylabel('Potencia entregada (W)')
-        a.legend(['Potencia','Consigna'])
+        a.set_xlabel('Time (s)')
+        a.set_ylabel('Delivered Power (W)')
+        a.legend(['Power','Setpoint'])
+      
     except ValueError:
+        a.clear()
+        a.plot(t,DataPower,'r',t,consigna,'b')
+        a.set_ylim(0,60)
+        a.set_xlim(left=0) 
+        a.set_xlabel('Time (s)')
+        a.set_ylabel('Delivered Power (W)')
+        a.legend(['Power','Setpoint'])
         pass
 def set_K(n):
     global K
@@ -187,7 +199,7 @@ class Emulador_UNIGRID(tk.Tk):
     def __init__(self, *args, **kwargs):
         
         tk.Tk.__init__(self,*args,**kwargs)
-        self.wm_title('Emulador Unigrid')
+        self.wm_title('UniGRID WT Emulator')
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand=True)
         container.grid_rowconfigure(0, weight = 1)
@@ -212,7 +224,7 @@ class Emulador_UNIGRID(tk.Tk):
     def on_exit(self):
         global DAC
         """When you click to exit, this function is called"""
-        if messagebox.askyesno("Exit", "Realmente quieres salir de Emulador Unigrid?"):        
+        if messagebox.askyesno("Exit", "Are you sure do you want to exit the emulator console?"):        
             self.destroy()
             DAC.set_voltage(0)
             sys.exit()
@@ -326,8 +338,8 @@ class Code_thread(threading.Thread):
             ads.data_rate = 860
             
             # Create Current and Voltage Filters
-            VolFilter = IIR2Filter(1,[5],'lowpass','butter',fs=1000)
-            CurFilter = IIR2Filter(1,[200],'lowpass','butter',fs=1000)
+            VolFilter = IIR2Filter(1,[10],'lowpass','cheby2',fs=5000)
+            CurFilter = IIR2Filter(1,[10],'lowpass','cheby2',fs=5000)
         #--------------------------------------------------------------------------------------------------
 
 
@@ -338,24 +350,24 @@ class Code_thread(threading.Thread):
                 kp = qkp.get()
                 qkp.put(kp)
             else:
-                kp = 0.55
+                kp = 0.01
             if (qki.empty()==False):
                 ki = qki.get()
                 qki.put(ki)
             else:
-                ki = 1
+                ki = 0.00005
             if (qkd.empty()==False):
                 kd = qkd.get()
                 qkd.put(kd)
             else:
-                kd = 0.01
+                kd = 0.004
             pid = PID(kp,ki,kd)
             npid.set("PID = {0}, {1}, {2}".format(str(pid.getKp()),str(pid.getKi()),str(pid.getKd())))
             print('PID = {0},{1},{2}'.format(pid.getKp(),pid.getKi(),pid.getKd()))
-            time.sleep(1)
+          #  time.sleep(1)
         #--------------------------------------------------------------------------------------------------
             
-            pid.SetPoint=20
+            pid.SetPoint=10
             pid.setSampleTime(0.001)
             feedback = 0
             feedback_list = []
@@ -391,16 +403,28 @@ class Code_thread(threading.Thread):
                 #-------------------------------------------------------------------------------------------------
                     mode=q.get()
                     if mode == 'Test':                
-                        if (timenow > 0 and timenow < 15):
-                            pid.SetPoint=20
-                        elif (timenow > 15 and timenow < 30):
-                            pid.SetPoint=30
-                        elif (timenow > 30 ):
+                        if (timenow > 0 and timenow < 20):
                             pid.SetPoint=10
+                        elif (timenow > 20 and timenow < 35):
+                            pid.SetPoint=30
+                        elif (timenow > 35 and timenow < 50):
+                            pid.SetPoint=10
+                        elif (timenow > 50 and timenow < 65):
+                            pid.SetPoint=30
+                        elif (timenow > 65 and timenow < 80):
+                            pid.SetPoint=45
+                        elif (timenow > 80 and timenow < 95):
+                            pid.SetPoint=35
+                        elif (timenow > 95 and timenow < 110):
+                            pid.SetPoint=20
+                        elif (timenow > 110 and timenow < 125):
+                            pid.SetPoint=10
+                        elif (timenow > 125 and timenow < 140):
+                            pid.SetPoint=5
                         q.put('Test')
                     elif mode == 'Perfil':
                         for j in range(len(WPt)-1):
-                            if (timenow > WPt[j] and timenow < WPt[j+1]):
+                            if (timenow > WPt[j]*Ad and timenow < WPt[j+1]*Ad):
                                 pid.SetPoint=WPpw[j]
                         q.put('Perfil')
                     elif mode == 'Manual':
@@ -472,20 +496,20 @@ class Principal(tk.Frame):
         voltbits=int((4096/5)*voltajedac)
         DAC.set_voltage(voltbits) 
         
+     
+        label = tk.Label(self, text = "UNIGRID WT Emulator Console", font = MEDIUM_FONT, background ='snow', foreground = ColorTitulo)
+        label.place(x =100, y=50, width=800, height=100)
         
-        label = tk.Label(self, text = "Emulador Eólico UNIGRID", font = LARGE_FONT, background ='snow', foreground = ColorTitulo)
-        label.place(x =250, y=50, width=1000, height=100)
-        
-        button1 = tk.Button(self, text = "Parámetros de Control", font= MEDIUM_FONT, background ='snow',relief = 'solid',
+        button1 = tk.Button(self, text = "Controller Parameters", font= MEDIUM_FONT, background ='snow',relief = 'solid',
                               command = lambda: [self.configLabelParametros(),self.setLabelParametros(), controller.show_frame(Parametros)]
                                     , )
         button1.place(x = 200, y = 250, width = 400, height = 100)
 
-        button2 = tk.Button(self, text = "Cargar Perfiles de Viento", font= MEDIUM_FONT, background ='snow',relief = 'solid',
+        button2 = tk.Button(self, text = "Load Wind Profiles", font= MEDIUM_FONT, background ='snow',relief = 'solid',
                               command = lambda: controller.show_frame(Perfiles))
         button2.place(x = 200, y = 450, width = 400, height = 100)
 
-        button3 = tk.Button(self, text = "Gráfica", font= MEDIUM_FONT,background ='snow',relief = 'solid',
+        button3 = tk.Button(self, text = "Plot", font= MEDIUM_FONT,background ='snow',relief = 'solid',
                               command = lambda: controller.show_frame(Visual))
         button3.place(x = 900, y =320, width = 200, height = 180)
         
@@ -494,19 +518,24 @@ class Principal(tk.Frame):
         
         
     def configLabelParametros(self):
-        global KpLabel, KiLabel, KdLabel,label2,label3,label4
+        global KpLabel, KiLabel, KdLabel,label2,label3,label4, Adlabel
+        label1.config(textvariable=AdLabel)
         label2.config(textvariable=KpLabel)
         label3.config(textvariable=KiLabel)
         label4.config(textvariable=KdLabel)
         
     def setLabelParametros(self):
-        global KpLabel, KiLabel, KdLabel,label2,label3,label4
+        global KpLabel, KiLabel, KdLabel,label2,label3,label4,Adlabel
+      #  Ad = qad.get()
+       # qad.put(Ad)
+   
         kp = qkp.get()
         qkp.put(kp)
         ki = qki.get()
         qki.put(ki)
         kd = qkd.get()
         qkd.put(kd)
+      #  Adlabel.set(Ad)
         KpLabel.set(kp)
         KiLabel.set(ki)
         KdLabel.set(kd)
@@ -524,38 +553,42 @@ class Parametros(tk.Frame):
         KpLabel.set(Kp)
         KiLabel.set(Ki)
         KdLabel.set(Kd)
-        print('pid actualizado')
-        actpid.set('PID actualizado')
+        print('Updated PID Controller')
+        actpid.set('Updated PID')
         sleep(3)
         actpid.set('')
         
     def __init__(self, parent, controller):
-        global pid, KpLabel, KiLabel, KdLabel,label2,label3,label4,labelactpid, actpid
+        global pid, KpLabel, KiLabel, KdLabel,label2,label3,label4,labelactpid, actpid, Adlabel
         tk.Frame.__init__(self,parent)
         
 
-        label = tk.Label(self, text = "Parámetros de Control", font = LARGE_FONT, background='snow', foreground = ColorTitulo)
+        label = tk.Label(self, text = "Controller Parameters", font = MEDIUM_FONT, background='snow', foreground = ColorTitulo)
         label.place(x = 350, y = 60, width = 900, height = 100)
 
-        button1 = tk.Button(self, text = "Atrás", font= MEDIUM_FONT,relief = 'solid', background='snow', 
+        button1 = tk.Button(self, text = "Back", font= MEDIUM_FONT,relief = 'solid', background='snow', 
                               command = lambda: [actpid.set(''),controller.show_frame(Principal)])
         button1.place(x = 100, y = 65, width = 200, height = 80)
 
-        button2 = tk.Button(self, text = "Insertar Kp",font= MEDIUM_FONT,relief = 'solid',background='snow', 
+        button2 = tk.Button(self, text = " Kp ",font= MEDIUM_FONT,relief = 'solid',background='snow', 
                               command = lambda: [controller.show_frame(Teclado),set_K(1)])
         button2.place(x = 250, y = 230, width = 300, height = 100)
 
-        button3 = tk.Button(self, text = "Insertar Ki",font= MEDIUM_FONT,relief = 'solid',background='snow', 
+        button3 = tk.Button(self, text = " Ki ",font= MEDIUM_FONT,relief = 'solid',background='snow', 
                               command = lambda: [controller.show_frame(Teclado),set_K(2)])
         button3.place(x = 250, y = 400, width = 300, height = 100)
 
-        button4 = tk.Button(self, text = "Insertar Kd",font= MEDIUM_FONT,relief = 'solid', background='snow', 
+        button4 = tk.Button(self, text = " Kd ",font= MEDIUM_FONT,relief = 'solid', background='snow', 
                               command = lambda: [controller.show_frame(Teclado),set_K(3)], image = "")
         button4.place(x = 250, y =570, width = 300, height = 100)
         
-        button5 = tk.Button(self, text = "Confirmar PID",font= MEDIUM_FONT,relief = 'solid', background='snow', 
-                              command = lambda:[self.confirmarpid(),actpid.set(''),controller.show_frame(Visual)], image = "")
-        button5.place(x = 1000, y =350, width = 220, height = 200)
+        button5 = tk.Button(self, text = " Ad ",font= MEDIUM_FONT,relief = 'solid', background='snow', 
+                              command = lambda: [controller.show_frame(Teclado),set_K(5)], image = "")
+        button5.place(x = 250, y =470, width = 300, height = 100)
+      
+      #  button5 = tk.Button(self, text = "Confirm PID",font= MEDIUM_FONT,relief = 'solid', background='snow', 
+      #                        command = lambda:[self.confirmarpid(),actpid.set(''),controller.show_frame(Visual)], image = "")
+     #   button5.place(x = 1000, y =350, width = 220, height = 200)
         
 
 class Perfiles(tk.Frame):
@@ -564,14 +597,14 @@ class Perfiles(tk.Frame):
     def __init__(self, parent, controller):
         global textvarOpenFile, labelFileOk
         tk.Frame.__init__(self,parent)
-        label = tk.Label(self, text = "Perfiles de Viento", font = LARGE_FONT, background ='snow', foreground = ColorTitulo)
+        label = tk.Label(self, text = "Wind Profiles", font = LARGE_FONT, background ='snow', foreground = ColorTitulo)
         label.place(x = 430, y = 60, width = 650, height = 100)
         
-        button1 = tk.Button(self, text = "Atrás",font= MEDIUM_FONT,relief = 'solid', background='snow',
+        button1 = tk.Button(self, text = "Back",font= MEDIUM_FONT,relief = 'solid', background='snow',
                               command = lambda: controller.show_frame(Principal))
         button1.place(x = 100, y = 65, width = 200, height = 80)
         
-        button2 = tk.Button(self, text = "Abrir",font= MEDIUM_FONT,relief = 'solid', background='snow',
+        button2 = tk.Button(self, text = "Open",font= MEDIUM_FONT,relief = 'solid', background='snow',
                               command = lambda: self.OpenWindFile())
         button2.place(x = 600, y = 300, width = 200, height = 200)
        
@@ -579,15 +612,30 @@ class Perfiles(tk.Frame):
 class Visual(tk.Frame):
     
     def startCodeThread(self):
-        global iniciando
+        global iniciando, actpid, Ad 
         try:
-            iniciando.set('Iniciando...')
+            Ad = float(Adlabel.get())
+            Kp = float(KpLabel.get())
+            Ki = float(KiLabel.get())
+            Kd = float(KdLabel.get())
+            print(Ad)
+        #    qad.put(Ad)
+            qkp.put(Kp)
+            qki.put(Ki)
+            qkd.put(Kd)
+        #    Adlabel.set(Ad)
+            KpLabel.set(Kp)
+            KiLabel.set(Ki)
+            KdLabel.set(Kd)
+            iniciando.set('Starting...')
             voltajedac = 3
             voltbits=int((4096/5)*voltajedac)
             DAC.set_voltage(voltbits)
+          
             self.code.start()
             
         except RuntimeError:
+            print("error2")
             self.code.kill()
             actpow.set('')
             self.cleargraph()
@@ -624,8 +672,8 @@ class Visual(tk.Frame):
             type(filename).__name__
             if filename != "":           
                 WPt, WPpw = self.readcsv(filename)
-            else:
-                textvarOpenFile.set('Carga de perfil cancelada')
+           # else:
+            #    textvarOpenFile.set('Wind Profile Load cancelled')
         except TypeError:
             pass
     def readcsv(self,filename):
@@ -637,28 +685,41 @@ class Visual(tk.Frame):
             x = []
             y = []
             for row in reader:
-                col0 = row[0]
-                hh,mm = col0.split(":")
-                col0 = int(hh)*3600+int(mm)*60 # Convierte hora en formato hh:mm a segundos
-                col0 = col0/3600*10 # Una hora se representa en 10 s
-                col1 = float(row[1].replace(",",".")) 
-                # Recta del perfil de viento (Convierte viento a potencia)
+                col0 = float(row[0])
+                #hh,mm = col0.split(":")
+                #col0 = int(hh)*3600+int(mm)*60 # Convierte hora en formato hh:mm a segundos
+                #col0 = col0/3600*10 # Una hora se representa en 10 s
+                #col1 = float(row[1].replace(",","."))
+                
+                col1 = float(row[1])
+                # Ajuste en el nivel de viento
+                col1 = 1.2*col1
+                
+                # Recta del perfil de viento (Convierte viento a potencia) y escalado al nivel del emulador (10:1)
                 col1 = (0.001723483*(col1**6)-0.04935507*(col1**5)+0.01124858*(col1**4)
                         +12.34628*(col1**3)-144.3604*(col1**2)+657.3997*col1-1038.827)*(1/10)
+                
+                # Limites de saturación de la turbina eolica
+                if col1 < 0:
+                    col1 = 0
+                elif col1 > 50:
+                    col1 = 0
+                    
                 print(str(col0)+" "+str(col1))
+                
                 x.append(col0)
                 y.append(col1)        
                 rownum += 1    
             ifile.close()
             filesplit = filename.split("/")
             namefile = filesplit[-1]
-            textvarOpenFile.set('El archivo '+namefile+' ha sido cargado')
+          #  textvarOpenFile.set('The File '+namefile+' has been loaded')
             mode = 'Perfil'
             q.put('Perfil')
             return x,y
         except (ValueError,TypeError,FileNotFoundError) as e:
-            textvarOpenFile.set('Error en la carga de archivo')
-            print('Archivo no abierto')
+         #   textvarOpenFile.set('Load File Error')
+            print('File not opened')
     def confirmarpid(self):
         global actpid
         Kp = float(KpLabel.get())
@@ -670,14 +731,14 @@ class Visual(tk.Frame):
         KpLabel.set(Kp)
         KiLabel.set(Ki)
         KdLabel.set(Kd)
-        print('pid actualizado')
-        actpid.set('PID actualizado')
+        print('Updated PID Controller')
+        actpid.set('Updated PID')
         sleep(3)
         actpid.set('')
     
     def __init__(self, parent, controller):
         global DAC,bttstop,bttgo,bttback,labelini, labelpow, actpow,labelFileOk
-        global pid, KpLabel, KiLabel, KdLabel,label2,label3,label4,labelactpid, actpid, lpid, labelUni
+        global pid, KpLabel, KiLabel, KdLabel,label2,label3,label4,labelactpid, actpid, lpid, labelUni,colimg, Adlabel, label1
         tk.Frame.__init__(self,parent)
         
         self.code = Code_thread()
@@ -687,83 +748,96 @@ class Visual(tk.Frame):
         canvas.draw()
         canvas.get_tk_widget().pack(side = "left")
         
-        b = 100
+        b = 150
                 
-        label = tk.Label(self, text = "Control Emulador UniGRID", font = LARGE_FONT, background ='snow', foreground = ColorTitulo)
-        label.place(x = 235, y = 100, width = 1000, height = 70)
+        label = tk.Label(self, text = "UniGRID WT Emulator Console", font = LARGE_FONT, background ='snow', foreground = ColorTitulo)
+        label.place(x = 150, y = 120, width = 1000, height = 70)
         
         labelUni = tk.Label(self,text='Uni', background ='snow')
-        labelUni.place(x =20, y=0, width=350, height=90)
+        labelUni.place(x =20, y=5, width=390, height=100)
         
-        labelnames = tk.Label(self,text='Proyecto Final realizado por: Kelly Gasser y Luis Plata ',font= SMALL_FONT, background='snow')
-        labelnames.place(x =1120, y=20, width=300, height=20)
-        labelases = tk.Label(self,text='Asesores: Mauricio Pardo y Loraine Navarro ',font= SMALL_FONT, background='snow')
-        labelases.place(x =1120, y=40, width=300, height=20)
-        labelyear = tk.Label(self,text='@2019',font= SMALL_FONT, background='snow')
-        labelyear.place(x =1120, y=60, width=300, height=20)
+        colimg = tk.Label(self,text='Col', background ='snow')
+        colimg.place(x =450, y=-10, width=390, height=110)
+        
+        labelnames = tk.Label(self,text='Electrical and Electronics Engineering Department',font= ("Verdana", 10,'bold'), background='snow')
+        labelnames.place(x =1034, y=30, width=400, height=20)
+        labelases = tk.Label(self,text='Research Group in Robotics and Intelligent Systems (GiRSi)',font= MEDIUM_FONT, background='snow')
+        labelases.place(x =980, y=50, width=500, height=20)
+        labelyear = tk.Label(self,text='@2019',font= MEDIUM_FONT, background='snow')
+        labelyear.place(x =1080, y=70, width=300, height=20)
                 
         bttgo = tk.Button(self, text = "Start",borderwidth = 0,relief = 'solid', background='snow',
                               command = lambda: [actpid.set(''),self.startCodeThread()], image = "")
-        bttgo.place(x = 420, y = 700, width = 110, height = 110)
+        bttgo.place(x = 1130, y = 700, width = 110, height = 110)
         
         bttstop = tk.Button(self, text = "Stop",borderwidth = 0,relief = 'solid', background='snow',
-                              command = lambda: [print('presionó stop'),self.clearqpower(),actpow.set(''),self.code.kill(),
+                              command = lambda: [print(' stop '),self.clearqpower(),actpow.set(''),self.code.kill(),
                                     DAC.set_voltage(0),actpid.set('')], image = '')
-        bttstop.place(x = 540, y = 700, width = 110, height = 110)
+        bttstop.place(x = 1280, y = 700, width = 110, height = 110)
                
-        labelpw = tk.Label(self, text = "PW:", font = ("Verdana", 30), background ='snow')
-        labelpw.place(x = 1110, y = 250, width = 90, height = 50)
+        labelpw = tk.Label(self, text = "Power:", font =("Verdana", 18,'bold') , background ='snow')
+        labelpw.place(x = 1140, y = 450+b, width = 90, height = 50)
         
-        labelpow = tk.Label(self, text = "50 W", font = ("Verdana", 30), background ='snow')
-        labelpow.place(x = 1200, y = 250, width = 180, height = 50)
+      #  labelad = tk.Label(self, text = "XX:", font =("Verdana", 18,'bold') , background ='snow')
+       # labelad.place(x = 1140, y = 360, width = 90, height = 50)
         
-        buttonconsig = tk.Button(self, text = "Consigna Manual", font= MEDIUM_FONT,relief = 'solid', background='snow',
+        labelpow = tk.Label(self, text = "50 W", font = ("Verdana", 18,'bold'), background ='snow')
+        labelpow.place(x = 1250, y = 450+b, width = 150, height = 50)
+        
+        buttonconsig = tk.Button(self, text = "Manual Setpoint", font= ("Verdana", 10,'bold'),relief = 'solid', background='snow',
                                 command = lambda: [controller.show_frame(Teclado),set_K(4)])
-        buttonconsig.place(x = 100, y = 700, width = 250, height = 50)
+        buttonconsig.place(x = 1130, y = 230, width = 250, height = 50)
         
-        buttonperfil = tk.Button(self, text = "Perfil de Viento",font= MEDIUM_FONT,relief = 'solid', background='snow',
+        buttonperfil = tk.Button(self, text = "Wind Profile",font= ("Verdana", 10,'bold'),relief = 'solid', background='snow',
                               command = lambda: self.OpenWindFile())
-        buttonperfil.place(x = 100, y = 760, width = 250, height = 50)
+        buttonperfil.place(x = 1130, y = 290, width = 250, height = 50)
         
-        labelFileOk = tk.Label(self, text = 'Archivo' ,font= MEDIUM_FONT, background='snow')
-        labelFileOk.place(x = 700, y = 730, width = 720, height = 50)
+      #  labelFileOk = tk.Label(self, text = 'File' ,font= MEDIUM_FONT, background='snow')
+     #   labelFileOk.place(x = 700, y = 330, width = 720, height = 50)
                 
-        labelini = tk.Label(self, text = "Iniciando...", font = ("Verdana", 14), background ='snow')
-        labelini.place(x = 475, y = 813, width = 100, height = 20)
+        labelini = tk.Label(self, text = "Starting...", font = ("Verdana", 14), background ='snow')
+        labelini.place(x = 1200, y = 813, width = 100, height = 20)
         
-        labelnamepid = tk.Label(self, text = 'Parametros del PID', font = ("Verdana", 14,'bold'), background='snow')
-        labelnamepid.place(x = 1130, y = 260+b, width = 220, height = 30)
+        labelnamepid = tk.Label(self, text = 'PID Controller Parameters', font = ("Verdana", 10,'bold'), background='snow')
+        labelnamepid.place(x = 1130, y = 270+b, width = 220, height = 30)
                 
-        button2 = tk.Button(self, text = "Insertar Kp",font= ("Verdana", 14),relief = 'solid',background='snow', 
+        button2 = tk.Button(self, text = " Kp ",font= ("Verdana", 10),relief = 'solid',background='snow', 
                               command = lambda: [controller.show_frame(Teclado),set_K(1)])
-        button2.place(x = 1130, y = 300+b, width = 120, height = 30)
+        button2.place(x = 1130, y = 310+b, width = 120, height = 30)
 
-        button3 = tk.Button(self, text = "Insertar Ki",font= ("Verdana", 14),relief = 'solid',background='snow', 
+        button3 = tk.Button(self, text = " Ki ",font= ("Verdana", 10),relief = 'solid',background='snow', 
                                command = lambda: [controller.show_frame(Teclado),set_K(2)])
-        button3.place(x = 1130, y = 340+b, width = 120, height = 30)
+        button3.place(x = 1130, y = 350+b, width = 120, height = 30)
 
-        button4 = tk.Button(self, text = "Insertar Kd",font= ("Verdana", 14),relief = 'solid', background='snow', 
+        button4 = tk.Button(self, text = " Kd ",font= ("Verdana", 10),relief = 'solid', background='snow', 
                                command = lambda: [controller.show_frame(Teclado),set_K(3)], image = "")
-        button4.place(x = 1130, y = 380+b, width = 120, height = 30)
+        button4.place(x = 1130, y = 390+b, width = 120, height = 30)
         
-        button5 = tk.Button(self, text = "Confirmar PID",font= ("Verdana", 14),relief = 'solid', background='snow', 
-                              command = lambda:[self.confirmarpid(),actpid.set(''),controller.show_frame(Visual)], image = "")
-        button5.place(x = 1160, y =425+b, width = 150, height = 40)
+        button5 = tk.Button(self, text = " Time Base ",font= ("Verdana", 10),relief = 'solid', background='snow', 
+                               command = lambda: [controller.show_frame(Teclado),set_K(5)], image = "")
+        button5.place(x = 1130, y = 220+b, width = 120, height = 30)
         
-        labelactpid = tk.Label(self, text = " ", font = ("Verdana", 14), background='snow')
-        labelactpid.place(x = 1150, y = 480+b, width = 200, height = 22)
+     #   button5 = tk.Button(self, text = "Confirm PID",font= ("Verdana", 10,'bold'),relief = 'solid', background='snow', 
+     #                        command = lambda:[self.confirmarpid(),actpid.set(''),controller.show_frame(Visual)], image = "")
+     #   button5.place(x = 1160, y =435+b, width = 150, height = 40)
         
-        lpid = tk.Label(self, text = '', font = ("Verdana", 14), background='snow')
-        lpid.place(x = 1150, y = 510+b, width = 200, height = 22)
+      #  labelactpid = tk.Label(self, text = " ", font = ("Verdana", 14), background='snow')
+      #  labelactpid.place(x = 1140, y = 500+b, width = 200, height = 22)
+        
+     #   lpid = tk.Label(self, text = '', font = ("Verdana", 14), background='snow')
+     #   lpid.place(x = 1130, y = 480+b, width = 200, height = 22)
+        
+        label1 = tk.Label(self, bg = "white",font= ("Verdana", 14), text = str(3))
+        label1.place(x = 1265, y = 220+b, width = 80, height = 30)
         
         label2 = tk.Label(self, bg = "white",font= ("Verdana", 14), text = str(pid.getKp()))
-        label2.place(x = 1265, y = 300+b, width = 80, height = 30)
+        label2.place(x = 1265, y = 310+b, width = 80, height = 30)
 
         label3 = tk.Label(self, bg = "white",font= ("Verdana", 14), text = str(pid.getKi()))
-        label3.place(x = 1265, y = 340+b, width = 80, height = 30)
+        label3.place(x = 1265, y = 350+b, width = 80, height = 30)
 
         label4 = tk.Label(self, bg = "white",font= ("Verdana", 14), text = str(pid.getKd()))
-        label4.place(x = 1265, y = 380+b, width = 80, height = 30)
+        label4.place(x = 1265, y = 390+b, width = 80, height = 30)
         
 class Teclado(tk.Frame):
                                     
@@ -812,17 +886,19 @@ class Teclado(tk.Frame):
                 q.put('Manual')
                 qsetpoint.put(float(consig))
                 #textvarOpenFile.set('Consigna = {0} W'.format(consig))
-                
-                
+            if K == 5:
+                print('Ad = '+ self.e.get())
+                Adlabel.set(self.e.get())
+                controller.show_frame(Visual)   
 
-        label = tk.Label(self, text = "Insertar Constante", font = LARGE_FONT, background = 'snow', foreground = ColorTitulo)
+        label = tk.Label(self, text = "Insert Constant", font = LARGE_FONT, background = 'snow', foreground = ColorTitulo)
         label.place(x = 350, y = 60, width = 800, height = 70) 
 
-        button1 = tk.Button(self, text = "Confirmar valor",  background = 'snow',font= MEDIUM_FONT,relief = 'solid', 
+        button1 = tk.Button(self, text = "Confirm Value",  background = 'snow',font= MEDIUM_FONT,relief = 'solid', 
                               command = lambda: [K_selection(),self.e.delete(0,len(self.e.get()))], image = "")
         button1.place(x = 900, y =600, width = 300, height = 100)
 
-        btthome = tk.Button(self, text = "Atrás", font= MEDIUM_FONT,borderwidth = 0, relief = 'solid', background='snow', 
+        btthome = tk.Button(self, text = "Back", font= MEDIUM_FONT,borderwidth = 0, relief = 'solid', background='snow', 
                               command = lambda: controller.show_frame(Visual))
         btthome.place(x = 100, y = 65, width = 80, height = 80)
         
@@ -870,23 +946,27 @@ class Teclado(tk.Frame):
                               command = lambda: button_click(0))
         button11.place(x = 350, y = 580, width = 100, height = 100)  
         
-        button11 = tk.Button(self, text = "Borrar", background = 'snow',font= MEDIUM_FONT,relief = 'solid',
+        button11 = tk.Button(self, text = "Clear", background = 'snow',font= MEDIUM_FONT,relief = 'solid',
                               command = button_clear)
         button11.place(x = 450, y = 580, width = 100, height = 100) 
 
 def configLabelParametros():
-        global KpLabel, KiLabel, KdLabel,label2,label3,label4
+        global KpLabel, KiLabel, KdLabel,label2,label3,label4, Adlabel
+        label1.config(textvariable=Adlabel)
         label2.config(textvariable=KpLabel)
         label3.config(textvariable=KiLabel)
         label4.config(textvariable=KdLabel)
 def setLabelParametros():
-        global KpLabel, KiLabel, KdLabel,label2,label3,label4
+        global KpLabel, KiLabel, KdLabel,label2,label3,label4, Adlabel
+      #  Ad = qad.get()
+      #  qad.put(Ad)
         kp = qkp.get()
         qkp.put(kp)
         ki = qki.get()
         qki.put(ki)
         kd = qkd.get()
         qkd.put(kd)
+       # Adlabel.set(Ad)
         KpLabel.set(kp)
         KiLabel.set(ki)
         KdLabel.set(kd)
@@ -900,13 +980,14 @@ q.put(mode)
 qsetpoint = queue.LifoQueue()
 qpower = queue.LifoQueue()
 #-------------------------PID-------------------------
-pid = PID(0.55,1,0.01)
+pid = PID(0.01,0.00005,0.004)
 qkp=queue.LifoQueue()
 qki=queue.LifoQueue()
 qkd=queue.LifoQueue()
-qkp.put(0.55)
-qki.put(1)
-qkd.put(0.01)
+#qad=queue.LifoQueue()
+qkp.put(0.01)
+qki.put(0.00005)
+qkd.put(0.004)
 #--------------------Clase root=Tk()----------------
 Interfaz = Emulador_UNIGRID()
 Interfaz.configure(bg = 'snow')
@@ -924,11 +1005,16 @@ btthome.configure(image=homeimg)
 imag = Image.open('LogoU.png')
 Uimg = ImageTk.PhotoImage(imag,master = Interfaz)
 labelUni.configure(image=Uimg)
+imag = Image.open('col.png')
+cimg = ImageTk.PhotoImage(imag,master = Interfaz)
+colimg.configure(image=cimg)
 
 #---------Label de los parametros del PID-------------
+Adlabel = StringVar(Interfaz)
 KpLabel = StringVar(Interfaz)
 KiLabel = StringVar(Interfaz)
 KdLabel = StringVar(Interfaz)
+Adlabel.set('1')
 KpLabel.set(pid.getKp())
 KiLabel.set(pid.getKi())
 KdLabel.set(pid.getKd())
@@ -936,8 +1022,8 @@ configLabelParametros()
 setLabelParametros()
 #-----------------------------------------------------
 textvarOpenFile = StringVar(Interfaz)
-textvarOpenFile.set('')
-labelFileOk.configure(textvariable = textvarOpenFile)
+#textvarOpenFile.set('')
+#labelFileOk.configure(textvariable = textvarOpenFile)
 #-----------------------------------------------------
 iniciando = StringVar(Interfaz)
 iniciando.set('')
@@ -945,11 +1031,11 @@ labelini.configure(textvariable = iniciando)
 #-----------------------------------------------------
 actpid = StringVar(Interfaz)
 actpid.set('')
-labelactpid.configure(textvariable = actpid)
+#labelactpid.configure(textvariable = actpid)
 
 npid = StringVar(Interfaz)
 npid.set('')
-lpid.configure(textvariable = npid)
+#lpid.configure(textvariable = "")
 #-----------------------------------------------------
 actpow = StringVar(Interfaz)
 actpow.set('')
