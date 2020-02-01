@@ -182,13 +182,13 @@ def animate(i):
         a.legend(['Power','Setpoint'])
       
     except ValueError:
-        a.clear()
-        a.plot(t,DataPower,'r',t,consigna,'b')
-        a.set_ylim(0,60)
-        a.set_xlim(left=0) 
-        a.set_xlabel('Time (s)')
-        a.set_ylabel('Delivered Power (W)')
-        a.legend(['Power','Setpoint'])
+      #  a.clear()
+      #  a.plot(t,DataPower,'r',t,consigna,'b')
+      #  a.set_ylim(0,60)
+      #  a.set_xlim(left=0) 
+      #  a.set_xlabel('Time (s)')
+      #  a.set_ylabel('Delivered Power (W)')
+      #  a.legend(['Power','Setpoint'])
         pass
 def set_K(n):
     global K
@@ -668,6 +668,7 @@ class Visual(tk.Frame):
             tkopenfile.withdraw()
             filename = askopenfilename(initialdir = '/media/pi')
             tkopenfile.destroy()
+           # tkopenfile.maxsize(1,1)
             print (filename)
             type(filename).__name__
             if filename != "":           
@@ -699,7 +700,7 @@ class Visual(tk.Frame):
                 col1 = (0.001723483*(col1**6)-0.04935507*(col1**5)+0.01124858*(col1**4)
                         +12.34628*(col1**3)-144.3604*(col1**2)+657.3997*col1-1038.827)*(1/10)
                 
-                # Limites de saturación de la turbina eolica
+                
                 if col1 < 0:
                     col1 = 0
                 elif col1 > 50:
@@ -991,6 +992,7 @@ qkd.put(0.004)
 #--------------------Clase root=Tk()----------------
 Interfaz = Emulador_UNIGRID()
 Interfaz.configure(bg = 'snow')
+Interfaz.resizable(True,True)
 
 #---------Añadir Imagen a botones---------------------
 imag = Image.open("stopimg.png")
@@ -1043,4 +1045,12 @@ labelpow.configure(textvariable = actpow)
 #-----------------------------------------------------
 Interfaz.attributes('-zoomed', True)
 ani = animation.FuncAnimation(f, animate, interval = 100)
+#width, height = Interfaz.winfo_screenwidth(), Interfaz.winfo_screenheight()
+
+#Interfaz.geometry(width,height)
+#Interfaz.pack_propagate(0)
+#print(width)
+#print(height) 
+
+#Interfaz.maxsize(1000,1000)
 Interfaz.mainloop()
