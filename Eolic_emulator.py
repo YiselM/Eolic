@@ -170,6 +170,8 @@ for i in range(5000):
 #-------------------------------------------------------------------------------------------------
     timenow=(time.time()-start)
     t.append(timenow)
+    #Web
+    t.pop(0)
     
     if (timenow > 0 and timenow < 15):
         pid.SetPoint=20

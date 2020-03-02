@@ -216,6 +216,8 @@ for i in range(2000):
         DataPower.append(DataVoltage[i]*DataCurrent[i])
         timenow=(time.time()-start)
         t.append(timenow)
+        #web
+        t.pop(0)
         
         # --------------------------------------- PID CONTROLLER------------------------------------------
         pid.update(DataPower[i])    

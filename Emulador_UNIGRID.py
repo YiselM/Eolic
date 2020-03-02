@@ -22,6 +22,10 @@ import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 from IIR2Filter import IIR2Filter
 import Adafruit_MCP4725
+#Web
+import requests
+import json
+
 
 import threading
 import queue
@@ -62,6 +66,7 @@ DataOut = []
 t = []
 
 consigna = []
+
 
 
 
@@ -387,6 +392,14 @@ class Code_thread(threading.Thread):
             iniciando.set('')
             starttime = time.time()
             self.powermeter.start()
+            #Web
+            inicio = time.time()
+            j = 45
+            #r = requests.get('https://api.weather.com/v2/pws/observations/all/1day?stationId=IATLNTIC4&format=json&units=e&apiKey=8c1a32a8e11c4d819a32a8e11ccd81e7')
+            #resultado = r.json()
+            #json local
+            with open('1day.json') as f:
+                resultado = json.load(f)
         #------------------------------------- MAIN LOOP--------------------------------------------------    
             #for i in range(2000):
             while True:
@@ -399,29 +412,42 @@ class Code_thread(threading.Thread):
                     DataCurrent.append(CurFilter.filter(Current))     
                 #-------------------------------------------Tiempo------------------------------------------------
                     timenow=(time.time()-starttime)
-                    t.append(timenow)
+                    t.append(timenow) #creo que aquí acumulan el tiempo
+                    #Web
+                    #t.pop(0) #no estoy segura, pero creería que esto actualiza la ventana de tiempo
+                    tiempo = (time.time() - inicio)
+                    tiempo = round(tiempo,2)
                 #-------------------------------------------------------------------------------------------------
                     mode=q.get()
-                    if mode == 'Test':                
-                        if (timenow > 0 and timenow < 20):
-                            pid.SetPoint=10
-                        elif (timenow > 20 and timenow < 35):
-                            pid.SetPoint=30
-                        elif (timenow > 35 and timenow < 50):
-                            pid.SetPoint=10
-                        elif (timenow > 50 and timenow < 65):
-                            pid.SetPoint=30
-                        elif (timenow > 65 and timenow < 80):
-                            pid.SetPoint=45
-                        elif (timenow > 80 and timenow < 95):
-                            pid.SetPoint=35
-                        elif (timenow > 95 and timenow < 110):
-                            pid.SetPoint=20
-                        elif (timenow > 110 and timenow < 125):
-                            pid.SetPoint=10
-                        elif (timenow > 125 and timenow < 140):
-                            pid.SetPoint=5
-                        q.put('Test')
+                    if mode == 'Web':
+                        #print(resultado['observations'][0]['imperial']['windspeedAvg'])
+                        #Yisel's magic
+                        viento = resultado['observations'][j]['imperial']['windspeedAvg'] #obtengo el viento
+                        #falta suavizar la pendiente
+                        k = j - 1
+                        t.pop(0)  
+                        print(t)
+                        if(resultado['observations'][k]['imperial']['windspeedAvg'] - resultado['observations'][j]['imperial']['windspeedAvg'] >= 5):
+                            if(tiempo < 5):
+                                viento = viento/2
+                            if(tiempo > 5):
+                                viento = resultado['observations'][j]['imperial']['windspeedAvg']
+                        
+                        pow_viento = (0.001723483*(viento**6)-0.04935507*(viento**5)+0.01124858*(viento**4)+12.34628*(viento**3)-144.3604*(viento**2)+657.3997*viento-1038.827)*(1/10)
+                        if pow_viento < 0:
+                            pow_viento = 0.3
+                        elif pow_viento > 50:
+                            pow_viento = 0.3
+                        pid.SetPoint=pow_viento
+                        if(tiempo >= 10): # cada 300 segundos que actualice la lectura del json
+                            #r = requests.get('https://api.weather.com/v2/pws/observations/all/1day?stationId=IATLNTIC4&format=json&units=e&apiKey=8c1a32a8e11c4d819a32a8e11ccd81e7')
+                            #resultado = r.json()
+                            inicio = time.time() #reinicio el contador
+                            j = j + 1 #apunto a la siguiente dirección
+                            #t.pop(0)
+                            
+                            
+                        q.put('Web')
                     elif mode == 'Perfil':
                         for j in range(len(WPt)-1):
                             if (timenow > WPt[j]*Ad and timenow < WPt[j+1]*Ad):
@@ -702,9 +728,9 @@ class Visual(tk.Frame):
                 
                 
                 if col1 < 0:
-                    col1 = 0
+                    col1 = 0.3
                 elif col1 > 50:
-                    col1 = 0
+                    col1 = 0.3
                     
                 print(str(col0)+" "+str(col1))
                 
@@ -976,7 +1002,7 @@ def setLabelParametros():
 DAC = Adafruit_MCP4725.MCP4725(address=0x60, busnum=1)
 #-----------Pila para el modo del emulador------------
 q=queue.LifoQueue()
-mode = 'Test'
+mode = 'Web'
 q.put(mode)
 qsetpoint = queue.LifoQueue()
 qpower = queue.LifoQueue()
