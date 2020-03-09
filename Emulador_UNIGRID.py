@@ -180,11 +180,14 @@ def animate(i):
     try:
         a.clear()
         a.plot(t,DataPower,'r',t,consigna,'b')
+        #web
+        #a.set_xlim(min(t), max(t))
         a.set_ylim(0,60)
         a.set_xlim(left=0) 
         a.set_xlabel('Time (s)')
         a.set_ylabel('Delivered Power (W)')
         a.legend(['Power','Setpoint'])
+
       
     except ValueError:
       #  a.clear()
@@ -360,7 +363,7 @@ class Code_thread(threading.Thread):
                 ki = qki.get()
                 qki.put(ki)
             else:
-                ki = 0.00005
+                ki = 0.00001
             if (qkd.empty()==False):
                 kd = qkd.get()
                 qkd.put(kd)
@@ -392,14 +395,13 @@ class Code_thread(threading.Thread):
             iniciando.set('')
             starttime = time.time()
             self.powermeter.start()
+            
             #Web
+            viento = 3
+            delta = 3
+            step_dm = 0.03
             inicio = time.time()
-            j = 45
-            #r = requests.get('https://api.weather.com/v2/pws/observations/all/1day?stationId=IATLNTIC4&format=json&units=e&apiKey=8c1a32a8e11c4d819a32a8e11ccd81e7')
-            #resultado = r.json()
-            #json local
-            with open('1day.json') as f:
-                resultado = json.load(f)
+            
         #------------------------------------- MAIN LOOP--------------------------------------------------    
             #for i in range(2000):
             while True:
@@ -412,42 +414,45 @@ class Code_thread(threading.Thread):
                     DataCurrent.append(CurFilter.filter(Current))     
                 #-------------------------------------------Tiempo------------------------------------------------
                     timenow=(time.time()-starttime)
-                    t.append(timenow) #creo que aquí acumulan el tiempo
+                    t.append(timenow) 
                     #Web
-                    #t.pop(0) #no estoy segura, pero creería que esto actualiza la ventana de tiempo
                     tiempo = (time.time() - inicio)
                     tiempo = round(tiempo,2)
+                    
                 #-------------------------------------------------------------------------------------------------
                     mode=q.get()
                     if mode == 'Web':
-                        #print(resultado['observations'][0]['imperial']['windspeedAvg'])
-                        #Yisel's magic
-                        viento = resultado['observations'][j]['imperial']['windspeedAvg'] #obtengo el viento
-                        #falta suavizar la pendiente
-                        k = j - 1
-                        t.pop(0)  
-                        print(t)
-                        if(resultado['observations'][k]['imperial']['windspeedAvg'] - resultado['observations'][j]['imperial']['windspeedAvg'] >= 5):
-                            if(tiempo < 5):
-                                viento = viento/2
-                            if(tiempo > 5):
-                                viento = resultado['observations'][j]['imperial']['windspeedAvg']
                         
-                        pow_viento = (0.001723483*(viento**6)-0.04935507*(viento**5)+0.01124858*(viento**4)+12.34628*(viento**3)-144.3604*(viento**2)+657.3997*viento-1038.827)*(1/10)
+                           
+                        if (tiempo >= 60): # cada 300 segundos que actualice la lectura del json
+                            r = requests.get('https://api.weather.com/v2/pws/observations/current?stationId=IATLNTIC4&format=json&units=m&apiKey=8c1a32a8e11c4d819a32a8e11ccd81e7')
+                            resultado = r.json()
+                            inicio = time.time() #reinicio el contador
+                            viento_kph = resultado['observations'][0]['metric']['windSpeed'] #obtengo el viento    
+                            viento_kph = viento_kph + 8 #Esteroides para el viento
+                            #print(viento_kph)
+                            viento = viento_kph*(10/36)
+                            print(viento)
+                        
+                        #Modulador delta para el setting del viento    
+                        if (delta < (viento-step_dm)):
+                            delta = delta + step_dm
+                        elif ((viento-step_dm) <= delta <= (viento+step_dm)):
+                            delta = delta
+                        elif (delta > (viento+step_dm)):
+                            delta = delta - step_dm
+                            
+                            
+                        pow_viento = (0.001723483*(delta**6)-0.04935507*(delta**5)+0.01124858*(delta**4)+12.34628*(delta**3)-144.3604*(delta**2)+657.3997*delta-1038.827)*(1/10)
                         if pow_viento < 0:
                             pow_viento = 0.3
-                        elif pow_viento > 50:
+                        elif pow_viento > 52:
                             pow_viento = 0.3
+                            
                         pid.SetPoint=pow_viento
-                        if(tiempo >= 10): # cada 300 segundos que actualice la lectura del json
-                            #r = requests.get('https://api.weather.com/v2/pws/observations/all/1day?stationId=IATLNTIC4&format=json&units=e&apiKey=8c1a32a8e11c4d819a32a8e11ccd81e7')
-                            #resultado = r.json()
-                            inicio = time.time() #reinicio el contador
-                            j = j + 1 #apunto a la siguiente dirección
-                            #t.pop(0)
-                            
-                            
+                                
                         q.put('Web')
+                    
                     elif mode == 'Perfil':
                         for j in range(len(WPt)-1):
                             if (timenow > WPt[j]*Ad and timenow < WPt[j+1]*Ad):
@@ -729,7 +734,7 @@ class Visual(tk.Frame):
                 
                 if col1 < 0:
                     col1 = 0.3
-                elif col1 > 50:
+                elif col1 > 52:
                     col1 = 0.3
                     
                 print(str(col0)+" "+str(col1))
@@ -1007,13 +1012,13 @@ q.put(mode)
 qsetpoint = queue.LifoQueue()
 qpower = queue.LifoQueue()
 #-------------------------PID-------------------------
-pid = PID(0.01,0.00005,0.004)
+pid = PID(0.01,0.00001,0.004)
 qkp=queue.LifoQueue()
 qki=queue.LifoQueue()
 qkd=queue.LifoQueue()
 #qad=queue.LifoQueue()
 qkp.put(0.01)
-qki.put(0.00005)
+qki.put(0.00001)
 qkd.put(0.004)
 #--------------------Clase root=Tk()----------------
 Interfaz = Emulador_UNIGRID()
@@ -1070,7 +1075,7 @@ actpow.set('')
 labelpow.configure(textvariable = actpow)
 #-----------------------------------------------------
 Interfaz.attributes('-zoomed', True)
-ani = animation.FuncAnimation(f, animate, interval = 100)
+ani = animation.FuncAnimation(f, animate, frames = 200, interval = 20)
 #width, height = Interfaz.winfo_screenwidth(), Interfaz.winfo_screenheight()
 
 #Interfaz.geometry(width,height)
